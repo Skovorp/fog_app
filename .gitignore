@@ -1,0 +1,25 @@
+# Xcode
+DerivedData/
+build/
+*.xcuserstate
+*.xcuserdatad/
+**/xcuserdata/
+*.xcworkspace/xcshareddata/swiftpm/Package.resolved
+*.swiftpm/
+
+# macOS
+.DS_Store
+
+# Build artifacts
+*.ipa
+*.dSYM.zip
+*.dSYM/
+
+# Trained CoreML model — exceeds GitHub's 100 MB limit. Re-export with:
+#   cd ../../feral && python -m feral.export_coreml \
+#     --checkpoint <your.pt> --input-size 256 --num-frames 16 \
+#     --output ../yc_demo/v2/FeralDemo/FeralModel.mlpackage
+FeralDemo/FeralModel.mlpackage/
+
+# App Store screenshot output (keep the script, drop the renders)
+appstore/*.png

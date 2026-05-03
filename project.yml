@@ -1,0 +1,39 @@
+name: FeralDemo
+options:
+  bundleIdPrefix: com.razza
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    DEVELOPMENT_TEAM: "V5B6TWY55Y"
+    CODE_SIGN_STYLE: Automatic
+
+targets:
+  FeralDemo:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: FeralDemo
+        excludes:
+          - "Info.plist"
+          - "FeralDemo.entitlements"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.razza.feraldemov2ojnvdfijvn
+        PRODUCT_NAME: FeralDemo
+        TARGETED_DEVICE_FAMILY: "1"
+        INFOPLIST_FILE: FeralDemo/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        # Memory entitlements are gated to paid Apple Developer Program.
+        # Free Personal teams cannot sign with them — uncomment when on a paid team.
+        # CODE_SIGN_ENTITLEMENTS: FeralDemo/FeralDemo.entitlements
+        SWIFT_VERSION: "5.9"
+        IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+        ENABLE_PREVIEWS: YES
+        SUPPORTS_MACCATALYST: NO
+        ASSETCATALOG_COMPILER_APPICON_NAME: "AppIcon"
