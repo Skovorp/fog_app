@@ -48,43 +48,52 @@ def make_screen_1():
     im = Image.new("RGB", (W, H), BG)
     d = ImageDraw.Draw(im)
 
-    title_f = font(180, 800)
-    sub_f = font(70, 500)
-    pill_f = font(54, 600)
+    title_f = font(200, 800)
+    sub_f = font(78, 500)
+    pill_f = font(60, 600)
 
-    # Headline
-    line1 = "Score"
-    line2 = "freezing of gait."
-    title_y = 380
-    draw_text(d, (W // 2, title_y), line1, title_f, WHITE, anchor="mt")
-    draw_text(d, (W // 2, title_y + 200), line2, title_f, WHITE, anchor="mt")
-
-    # Subhead — explicitly call out Parkinson's symptom + the test
-    sub_y = title_y + 480
-    draw_text(d, (W // 2, sub_y), "A Parkinson's symptom,", sub_f, SECONDARY, anchor="mt")
-    draw_text(d, (W // 2, sub_y + 100), "from a turn-in-place test.", sub_f, SECONDARY, anchor="mt")
-
-    # Vertical stack of pills (portrait fits them better than horizontal)
     pills = [
         ("On-device", GREEN),
         ("No wifi", ACCENT),
         ("Real-time on iPhone 16+", WHITE),
     ]
-    pill_y = sub_y + 320
-    pad_x, pad_y = 56, 26
-    h = pill_f.size + 2 * pad_y
-    gap = 30
+    pad_x, pad_y = 60, 30
+    pill_h = pill_f.size + 2 * pad_y
+    pill_gap = 36
+
+    # Compute total block height (title 2 lines + gap + sub 2 lines + gap + pills) for vertical centering
+    title_h = 2 * title_f.size + 30
+    title_to_sub = 130
+    sub_h = 2 * sub_f.size + 30
+    sub_to_pills = 220
+    pills_h = len(pills) * pill_h + (len(pills) - 1) * pill_gap
+    total = title_h + title_to_sub + sub_h + sub_to_pills + pills_h
+    top = (H - total) // 2
+
+    # Title
+    y = top
+    draw_text(d, (W // 2, y), "Score", title_f, WHITE, anchor="mt")
+    y += title_f.size + 30
+    draw_text(d, (W // 2, y), "freezing of gait.", title_f, WHITE, anchor="mt")
+    y += title_f.size + title_to_sub
+
+    # Subhead
+    draw_text(d, (W // 2, y), "A Parkinson's symptom,", sub_f, SECONDARY, anchor="mt")
+    y += sub_f.size + 30
+    draw_text(d, (W // 2, y), "from a turn-in-place test.", sub_f, SECONDARY, anchor="mt")
+    y += sub_f.size + sub_to_pills
+
+    # Pills
     for text, color in pills:
         w = text_w(d, text, pill_f) + 2 * pad_x
         x = (W - w) // 2
-        d.rounded_rectangle((x, pill_y, x + w, pill_y + h), radius=h // 2, outline=color, width=4)
-        draw_text(d, (W // 2, pill_y + h // 2), text, pill_f, color, anchor="mm")
-        pill_y += h + gap
+        d.rounded_rectangle((x, y, x + w, y + pill_h), radius=pill_h // 2, outline=color, width=4)
+        draw_text(d, (W // 2, y + pill_h // 2), text, pill_f, color, anchor="mm")
+        y += pill_h + pill_gap
 
-    # Footer note
-    note = "feral · made for clinicians and researchers"
-    note_f = font(36, 400)
-    draw_text(d, (W // 2, H - 120), note, note_f, TERTIARY, anchor="mb")
+    # Footer
+    note_f = font(38, 400)
+    draw_text(d, (W // 2, H - 90), "feral · made for clinicians and researchers", note_f, TERTIARY, anchor="mb")
 
     out = OUT / "screen_1.png"
     im.save(out)
@@ -102,7 +111,7 @@ def make_screen_2():
     # 90° clockwise. Rotate +90° (counterclockwise in PIL) to put the bar at
     # the bottom and the Stop button at the top-right where they actually are.
     src = src.rotate(90, expand=True)
-    sw, sh = src.size  # 848 × 384 landscape
+    sw, sh = src.size  # 848 × 384
 
     # Trim a thin strip on each side to focus on action
     cl = int(sw * 0.04)
@@ -110,41 +119,14 @@ def make_screen_2():
     src = src.crop((cl, 0, sw - cr, sh))
     sw, sh = src.size
 
-    # Headline at top
-    title_f = font(150, 800)
-    sub_f = font(64, 500)
-    head_y = 220
-    draw_text(d, (W // 2, head_y), "See freezing", title_f, WHITE, anchor="mt")
-    draw_text(d, (W // 2, head_y + 170), "as it happens.", title_f, WHITE, anchor="mt")
-    sub_y = head_y + 410
-    draw_text(d, (W // 2, sub_y), "Per-frame fog probability,", sub_f, SECONDARY, anchor="mt")
-    draw_text(d, (W // 2, sub_y + 80), "live on the bottom bar.", sub_f, SECONDARY, anchor="mt")
-
-    # Place the landscape screenshot below the headline, fitting full canvas width
-    margin = 60
-    target_w = W - 2 * margin
-    target_h = int(sh * (target_w / sw))
-    src = src.resize((target_w, target_h), Image.LANCZOS)
-
-    # Drop shadow
-    shadow = Image.new("RGBA", (target_w + 80, target_h + 80), (0, 0, 0, 0))
-    sd = ImageDraw.Draw(shadow)
-    sd.rounded_rectangle((40, 40, target_w + 40, target_h + 40), radius=44, fill=(0, 0, 0, 200))
-    shadow = shadow.filter(ImageFilter.GaussianBlur(28))
-
-    # Round the screenshot corners
-    mask = Image.new("L", (target_w, target_h), 0)
-    md = ImageDraw.Draw(mask)
-    md.rounded_rectangle((0, 0, target_w, target_h), radius=40, fill=255)
-
-    device_x = margin
-    device_y = sub_y + 280
-    im.paste(shadow.convert("RGB"), (device_x - 40, device_y - 40), shadow.split()[3])
-    im.paste(src, (device_x, device_y), mask)
-
-    out = OUT / "screen_2.png"
-    im.save(out)
-    print(f"wrote {out}")
+    _layout_text_then_image(
+        im, d, src,
+        title_lines=["See freezing", "as it happens."],
+        sub_lines=["Per-frame fog probability,", "live on the bottom bar."],
+        out_path=OUT / "screen_2.png",
+        corner_radius=42,
+        image_h_ratio=0.55,
+    )
 
 # ──────────────────────────────────────────────────────────────────────
 # Screen 3: PDF report export
@@ -153,47 +135,78 @@ def make_screen_3():
     im = Image.new("RGB", (W, H), BG)
     d = ImageDraw.Draw(im)
 
-    # PDF page 1 = the 20.6%-fog session
     pdf_path = "/Users/ksc/Downloads/Telegram Desktop/feral_sessions_2026-05-03_18-20.pdf"
     doc = fitz.open(pdf_path)
     page = doc[1]
     pix = page.get_pixmap(matrix=fitz.Matrix(3, 3))
     pdf_img = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
 
-    # Headline at top
-    title_f = font(150, 800)
-    sub_f = font(64, 500)
-    head_y = 220
-    draw_text(d, (W // 2, head_y), "Export", title_f, WHITE, anchor="mt")
-    draw_text(d, (W // 2, head_y + 170), "clinical reports.", title_f, WHITE, anchor="mt")
-    sub_y = head_y + 410
-    draw_text(d, (W // 2, sub_y), "PDF or JSON. One tap.", sub_f, SECONDARY, anchor="mt")
-    draw_text(d, (W // 2, sub_y + 80), "Share with your care team.", sub_f, SECONDARY, anchor="mt")
+    _layout_text_then_image(
+        im, d, pdf_img,
+        title_lines=["Export", "clinical reports."],
+        sub_lines=["PDF or JSON. One tap.", "Share with your care team."],
+        out_path=OUT / "screen_3.png",
+        corner_radius=14,
+        image_h_ratio=0.34,  # PDF page fits canvas width naturally — no crop
+    )
 
-    # Place PDF page below, fitting canvas width
-    margin = 60
-    pw, ph = pdf_img.size
-    target_w = W - 2 * margin
-    target_h = int(ph * (target_w / pw))
-    pdf_img = pdf_img.resize((target_w, target_h), Image.LANCZOS)
+
+def _layout_text_then_image(im, d, image, title_lines, sub_lines, out_path,
+                            corner_radius, image_h_ratio=0.55):
+    """Centered-hero layout. The image is sized to occupy `image_h_ratio` of
+    the canvas height; if its natural aspect would overflow the canvas width,
+    it's center-cropped horizontally so the visible portion fills the canvas
+    edge-to-edge. Top/bottom margins are equal."""
+    title_f = font(180, 800)
+    sub_f = font(72, 500)
+    side_margin = 60
+
+    iw, ih = image.size
+    target_h = int(H * image_h_ratio)
+    target_w = int(iw * (target_h / ih))
+    image = image.resize((target_w, target_h), Image.LANCZOS)
+    canvas_inner = W - 2 * side_margin
+    if target_w > canvas_inner:
+        crop_x = (target_w - canvas_inner) // 2
+        image = image.crop((crop_x, 0, crop_x + canvas_inner, target_h))
+        target_w = canvas_inner
+
+    title_line_gap = 18
+    title_block_h = (len(title_lines) - 1) * (title_f.size + title_line_gap) + title_f.size
+    title_to_sub = 70
+    sub_line_gap = 18
+    sub_block_h = (len(sub_lines) - 1) * (sub_f.size + sub_line_gap) + sub_f.size
+    sub_to_image = 130
+
+    block_h = title_block_h + title_to_sub + sub_block_h + sub_to_image + target_h
+    top = (H - block_h) // 2
+
+    y = top
+    for i, line in enumerate(title_lines):
+        draw_text(d, (W // 2, y), line, title_f, WHITE, anchor="mt")
+        y += title_f.size + (title_line_gap if i < len(title_lines) - 1 else 0)
+    y += title_to_sub
+    for i, line in enumerate(sub_lines):
+        draw_text(d, (W // 2, y), line, sub_f, SECONDARY, anchor="mt")
+        y += sub_f.size + (sub_line_gap if i < len(sub_lines) - 1 else 0)
+    y += sub_to_image
+
+    device_x = (W - target_w) // 2
+    device_y = y
 
     shadow = Image.new("RGBA", (target_w + 80, target_h + 80), (0, 0, 0, 0))
     sd = ImageDraw.Draw(shadow)
-    sd.rounded_rectangle((40, 40, target_w + 40, target_h + 40), radius=18, fill=(0, 0, 0, 220))
+    sd.rounded_rectangle((40, 40, target_w + 40, target_h + 40), radius=corner_radius, fill=(0, 0, 0, 200))
     shadow = shadow.filter(ImageFilter.GaussianBlur(28))
-
     mask = Image.new("L", (target_w, target_h), 0)
     md = ImageDraw.Draw(mask)
-    md.rounded_rectangle((0, 0, target_w, target_h), radius=14, fill=255)
+    md.rounded_rectangle((0, 0, target_w, target_h), radius=corner_radius, fill=255)
 
-    device_x = margin
-    device_y = sub_y + 280
     im.paste(shadow.convert("RGB"), (device_x - 40, device_y - 40), shadow.split()[3])
-    im.paste(pdf_img, (device_x, device_y), mask)
+    im.paste(image, (device_x, device_y), mask)
 
-    out = OUT / "screen_3.png"
-    im.save(out)
-    print(f"wrote {out}")
+    im.save(out_path)
+    print(f"wrote {out_path}")
 
 
 if __name__ == "__main__":

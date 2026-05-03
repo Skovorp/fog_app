@@ -306,7 +306,7 @@ private struct SessionCard: View {
                         statChip(icon: "film.stack",
                                  text: "\(session.totalFrames) frames")
                         statChip(icon: session.fogCount == 0 ? "checkmark.circle.fill" : "exclamationmark.triangle.fill",
-                                 text: "\(session.fogCount) fog · \(String(format: "%.1f%%", session.fogPct))",
+                                 text: String(format: "%.1f%% fog", session.fogPct),
                                  tint: session.fogCount == 0 ? .green : .red)
                         if let bytes = videoSizeBytes {
                             statChip(icon: "video", text: VideoStore.formatBytes(bytes))
