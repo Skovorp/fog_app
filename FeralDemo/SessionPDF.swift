@@ -9,7 +9,7 @@ enum SessionPDF {
 
     static func generate(_ session: Session) throws -> URL {
         let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("Session_\(session.filenameStamp).pdf")
+            .appendingPathComponent("\(session.exportFilenameStem).pdf")
 
         let renderer = UIGraphicsPDFRenderer(bounds: pageRect, format: pdfFormat(for: session))
         try renderer.writePDF(to: url) { ctx in
@@ -37,38 +37,61 @@ enum SessionPDF {
     private static func draw(_ session: Session, in rect: CGRect) {
         let margin: CGFloat = 50
         var y: CGFloat = margin
+        let evaluation = session.effectiveEvaluation
+        let isFog = evaluation.headlinesFogPct
 
-        // Title
-        let title = session.displayTitle
-        title.draw(at: CGPoint(x: margin, y: y), withAttributes: [
+        // Title — evaluation name
+        evaluation.displayName.draw(at: CGPoint(x: margin, y: y), withAttributes: [
             .font: UIFont.systemFont(ofSize: 34, weight: .bold),
             .foregroundColor: UIColor.black,
         ])
         y += 46
 
-        // Timestamp
-        session.timestampString.draw(at: CGPoint(x: margin, y: y), withAttributes: [
+        // Subtitle — UPDRS item · timestamp
+        let subtitle = "\(evaluation.updrsItem) · \(session.timestampString)"
+        subtitle.draw(at: CGPoint(x: margin, y: y), withAttributes: [
             .font: UIFont.systemFont(ofSize: 15, weight: .regular),
             .foregroundColor: UIColor.darkGray,
         ])
-        y += 36
+        y += 24
 
-        // Stats — 4 columns spread across the page
+        // Research-preview caveat for non-FoG evaluations
+        if !isFog {
+            "Demo score · research preview".draw(at: CGPoint(x: margin, y: y), withAttributes: [
+                .font: UIFont.systemFont(ofSize: 11, weight: .medium),
+                .foregroundColor: UIColor.systemOrange.withAlphaComponent(0.85),
+            ])
+            y += 16
+        }
+        y += 12
+
+        // Stats — 4 columns spread across the page; columns depend on evaluation
         let durMin = Int(session.duration) / 60
         let durSec = Int(session.duration) % 60
-        let stats: [(String, String)] = [
-            ("Duration", "\(durMin)m \(durSec)s"),
-            ("Total frames", "\(session.totalFrames)"),
-            ("Fog frames", "\(session.fogCount)"),
-            ("Fog %", String(format: "%.1f%%", session.fogPct)),
-        ]
+        let stats: [(String, String)]
+        if isFog {
+            stats = [
+                ("Duration", "\(durMin)m \(durSec)s"),
+                ("Total frames", "\(session.totalFrames)"),
+                ("Fog frames", "\(session.fogCount)"),
+                ("Fog %", String(format: "%.1f%%", session.fogPct)),
+            ]
+        } else {
+            stats = [
+                ("Duration", "\(durMin)m \(durSec)s"),
+                ("Total frames", "\(session.totalFrames)"),
+                ("Score (0-1)", String(format: "%.2f", session.updrsScore)),
+                ("Band", session.updrsBand),
+            ]
+        }
         let statsBottom = drawStatsRow(stats, in: CGRect(
             x: margin, y: y, width: rect.width - 2 * margin, height: 0
         ))
         y = statsBottom + 28
 
         // Section header for the graph
-        "Fog probability per frame".draw(at: CGPoint(x: margin, y: y), withAttributes: [
+        let graphHeader = isFog ? "Fog probability per frame" : "Model probability per frame"
+        graphHeader.draw(at: CGPoint(x: margin, y: y), withAttributes: [
             .font: UIFont.systemFont(ofSize: 13, weight: .semibold),
             .foregroundColor: UIColor.darkGray,
         ])
@@ -81,7 +104,7 @@ enum SessionPDF {
             width: rect.width - 2 * margin - 32,
             height: rect.height - y - margin - 30
         )
-        drawGraph(scores: session.scores, in: graphRect)
+        drawGraph(scores: session.scores, in: graphRect, showFogThreshold: isFog)
 
         // Footer
         let footer = "feral: parkinson's"
@@ -122,7 +145,7 @@ enum SessionPDF {
         return rect.minY + labelHeight + 4 + valueHeight
     }
 
-    private static func drawGraph(scores: [Float], in rect: CGRect) {
+    private static func drawGraph(scores: [Float], in rect: CGRect, showFogThreshold: Bool) {
         guard let ctx = UIGraphicsGetCurrentContext() else { return }
 
         let labelAttrs: [NSAttributedString.Key: Any] = [
@@ -163,31 +186,33 @@ enum SessionPDF {
 
         let n = scores.count
 
-        // Fog regions filled (above threshold) — light red bars
-        ctx.setFillColor(UIColor.systemRed.withAlphaComponent(0.16).cgColor)
-        var i = 0
-        while i < n {
-            if scores[i] >= Session.fogThreshold {
-                var j = i
-                while j < n && scores[j] >= Session.fogThreshold { j += 1 }
-                let x0 = rect.minX + rect.width * CGFloat(i) / CGFloat(n)
-                let x1 = rect.minX + rect.width * CGFloat(j) / CGFloat(n)
-                ctx.fill(CGRect(x: x0, y: rect.minY, width: x1 - x0, height: rect.height))
-                i = j
-            } else {
-                i += 1
+        if showFogThreshold {
+            // Fog regions filled (above threshold) — light red bars
+            ctx.setFillColor(UIColor.systemRed.withAlphaComponent(0.16).cgColor)
+            var i = 0
+            while i < n {
+                if scores[i] >= Session.fogThreshold {
+                    var j = i
+                    while j < n && scores[j] >= Session.fogThreshold { j += 1 }
+                    let x0 = rect.minX + rect.width * CGFloat(i) / CGFloat(n)
+                    let x1 = rect.minX + rect.width * CGFloat(j) / CGFloat(n)
+                    ctx.fill(CGRect(x: x0, y: rect.minY, width: x1 - x0, height: rect.height))
+                    i = j
+                } else {
+                    i += 1
+                }
             }
-        }
 
-        // Threshold line at 0.5 (dashed red)
-        let thresholdY = rect.maxY - rect.height * CGFloat(Session.fogThreshold)
-        ctx.setStrokeColor(UIColor.systemRed.withAlphaComponent(0.55).cgColor)
-        ctx.setLineWidth(0.8)
-        ctx.setLineDash(phase: 0, lengths: [4, 3])
-        ctx.move(to: CGPoint(x: rect.minX, y: thresholdY))
-        ctx.addLine(to: CGPoint(x: rect.maxX, y: thresholdY))
-        ctx.strokePath()
-        ctx.setLineDash(phase: 0, lengths: [])
+            // Threshold line at 0.5 (dashed red)
+            let thresholdY = rect.maxY - rect.height * CGFloat(Session.fogThreshold)
+            ctx.setStrokeColor(UIColor.systemRed.withAlphaComponent(0.55).cgColor)
+            ctx.setLineWidth(0.8)
+            ctx.setLineDash(phase: 0, lengths: [4, 3])
+            ctx.move(to: CGPoint(x: rect.minX, y: thresholdY))
+            ctx.addLine(to: CGPoint(x: rect.maxX, y: thresholdY))
+            ctx.strokePath()
+            ctx.setLineDash(phase: 0, lengths: [])
+        }
 
         // Score line
         ctx.setStrokeColor(UIColor.black.cgColor)

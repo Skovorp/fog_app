@@ -79,6 +79,16 @@ final class CameraSession: NSObject {
         }
     }
 
+    /// Switch from preview-only to recording. Must be called after `start(...)`
+    /// returned and the session is `.capturing`. The next sample buffer that
+    /// arrives on `videoQueue` will lazily configure the AVAssetWriter — there
+    /// is no separate "start writing" handshake.
+    func beginRecording(to url: URL) {
+        videoQueue.async { [videoWriter] in
+            videoWriter.reset(url: url)
+        }
+    }
+
     /// Stop capture and finalize the video file (if recording). Returns when
     /// the .mp4 is fully flushed to disk and safe to read.
     func stop() async {

@@ -201,15 +201,19 @@ enum SessionExport {
         )
         y += 28
 
-        // Column layout
+        // Column layout. "Score" + "Detail" are evaluation-aware (FoG shows
+        // % fog + fog-frame count; regression heads show the 0-1 score + band)
+        // so a mixed export doesn't pin everything to zero like a hardcoded
+        // "Fog %" column would.
         let columns: [(String, CGFloat, NSTextAlignment)] = [
-            ("Title",      170, .left),
-            ("Date",       110, .left),
-            ("Time",        70, .left),
-            ("Duration",    80, .left),
-            ("Frames",      70, .right),
-            ("Fog",         60, .right),
-            ("Fog %",       70, .right),
+            ("Title",      150, .left),
+            ("Type",        90, .left),
+            ("Date",        95, .left),
+            ("Time",        55, .left),
+            ("Duration",    65, .left),
+            ("Frames",      55, .right),
+            ("Score",       60, .right),
+            ("Detail",      60, .right),
             ("Page",        50, .right),
         ]
         let tableWidth = columns.reduce(0) { $0 + $1.1 }
@@ -255,14 +259,26 @@ enum SessionExport {
             let durSec = Int(session.duration) % 60
             let pageNum = i + 2  // TOC is page 1 (index 0); session pages start at index 1 → "page 2"
 
+            let evaluation = session.effectiveEvaluation
+            let scoreText: String
+            let detailText: String
+            if evaluation.headlinesFogPct {
+                scoreText = String(format: "%.1f%%", session.fogPct)
+                detailText = "\(session.fogCount) fog"
+            } else {
+                scoreText = String(format: "%.2f", session.updrsScore)
+                detailText = session.updrsBand
+            }
+
             let values: [String] = [
                 session.displayTitle,
+                evaluation.displayName,
                 dateF.string(from: session.startedAt),
                 timeF.string(from: session.startedAt),
                 "\(durMin)m \(durSec)s",
                 "\(session.totalFrames)",
-                "\(session.fogCount)",
-                String(format: "%.1f%%", session.fogPct),
+                scoreText,
+                detailText,
                 "\(pageNum)",
             ]
 

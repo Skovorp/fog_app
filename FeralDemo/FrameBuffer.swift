@@ -4,18 +4,14 @@ import Observation
 
 /// Holds the rolling list of captured frames and schedules inference chunks.
 ///
-/// Inference uses 64-frame chunks with a 32-frame shift (50% overlap), so each
-/// frame in the middle of the recording gets scored twice and we average. The
-/// first 32 frames and the last <chunk in flight> are scored only once.
-///
-/// Policy:
-///   - One inference at a time. Process is fast enough (~570 ms / chunk) to
-///     keep up at 32-frame intervals on a 24 fps camera (1333 ms).
-///   - When a chunk finishes, immediately try to kick the next chunk
-///     (start += 32). If the camera hasn't caught up yet, the kick fires
-///     later when `append(buffer:)` adds the trailing frame.
-///   - Per-frame `score` exposed by `Frame` is `scoreSum / scoreCount` —
-///     callers (the bar, the saved session) treat it as a single value.
+/// Chunk strategy is per-evaluation, configured from `Inference.evaluation`:
+///   - **FoG**: 64-frame chunks with a 32-frame shift (50% overlap). Each
+///     middle frame ends up with two predictions; we average. First 32 and
+///     trailing in-flight frames are scored only once.
+///   - **Walking / Chair / Tapping**: 64-frame chunks with a 64-frame shift
+///     (no overlap). The model returns a single chunk-level scalar which
+///     `Inference` stamps to every capture frame in the window — so each
+///     frame here ends up with scoreCount=1.
 ///
 /// To keep memory bounded, each frame's CVPixelBuffer is dropped once both
 /// (a) it sits below the next pending chunk's start, and (b) it's older than
@@ -35,8 +31,16 @@ final class FrameBuffer {
         }
     }
 
+    /// Capture-side chunk size. Always 64 — matches the rolling 2.67 s window
+    /// the camera buffers across all evaluations.
     static let chunkSize: Int = 64
+    /// Default shift, used by simulator-only synthetic streams and as the
+    /// chunkShift when no Inference is attached (loading-spinner case).
     static let chunkShift: Int = 32
+
+    /// Per-instance chunk shift — driven by the evaluation. 32 for FoG (50%
+    /// overlap), 64 for the regression heads (no overlap).
+    let chunkShift: Int
 
     private(set) var frames: [Frame] = []
     private(set) var inferenceInflight: Bool = false
@@ -48,6 +52,7 @@ final class FrameBuffer {
 
     init(inference: Inference?, onError: @escaping (Error) -> Void) {
         self.inference = inference
+        self.chunkShift = inference?.evaluation.captureChunkShift ?? Self.chunkShift
         self.onError = onError
     }
 
@@ -57,7 +62,7 @@ final class FrameBuffer {
         kickInferenceIfReady()
     }
 
-    /// Simulator fallback: append a frame with no pixel buffer (no real inference).
+    /// Simulator fallback: append a frame with no pixel buffer.
     func appendSynthetic(score: Float? = nil) {
         var frame = Frame(index: frames.count, pixelBuffer: nil)
         if let score {
@@ -68,9 +73,7 @@ final class FrameBuffer {
     }
 
     /// Simulator hook — applies a chunk of synthetic scores through the same
-    /// running-average path the real inference path uses, so the saved session
-    /// in simulator looks the same shape (frames in [chunkShift, last) end up
-    /// with `scoreCount == 2`).
+    /// running-average path the real inference path uses.
     func applySyntheticChunk(_ scores: [Float], start: Int) {
         applyChunkScores(scores, start: start)
     }
@@ -85,8 +88,6 @@ final class FrameBuffer {
     private func dropOldBuffers() {
         let total = frames.count
         let keepLatestFrom = max(0, total - 128)
-        // Frames at or after `pendingLow` may still be needed to feed the
-        // in-flight chunk and/or the next-pending chunk.
         let pendingLow = inferenceInflight ? min(inflightStart, nextChunkStart) : nextChunkStart
 
         for i in 0..<keepLatestFrom where frames[i].pixelBuffer != nil {
@@ -101,6 +102,17 @@ final class FrameBuffer {
         let total = frames.count
         let chunkSize = Self.chunkSize
 
+        // Skip-queued: when inference can't keep up with capture, skip past
+        // older fully-captured chunks and jump to the latest one. The frames
+        // in skipped chunks stay scoreless — those gaps show up as holes in
+        // the timeline. Only enabled for the slow 64-frame walking debug
+        // evaluation; everyone else processes chunks in order.
+        if inference.evaluation.skipQueuedChunks {
+            while nextChunkStart + chunkShift + chunkSize - 1 < total {
+                nextChunkStart += chunkShift
+            }
+        }
+
         let start = nextChunkStart
         let end = start + chunkSize - 1
         guard end < total else { return }
@@ -110,7 +122,7 @@ final class FrameBuffer {
 
         inferenceInflight = true
         inflightStart = start
-        nextChunkStart = start + Self.chunkShift
+        nextChunkStart = start + chunkShift
 
         Task.detached { [weak self] in
             do {
@@ -127,7 +139,9 @@ final class FrameBuffer {
         }
     }
 
-    /// Adds a chunk's scores into the running per-frame average.
+    /// Adds a chunk's scores into the running per-frame average. Inference
+    /// always returns exactly `chunkSize` scores (FoG: per-frame; regression:
+    /// chunk scalar stamped to every frame).
     private func applyChunkScores(_ scores: [Float], start: Int) {
         for (offset, score) in scores.enumerated() {
             let i = start + offset

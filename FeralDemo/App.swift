@@ -1,33 +1,56 @@
 import SwiftUI
 import Observation
+import AVFoundation
+import ClerkKit
 
-enum AppPhase {
-    case idle
-    case recording
+enum AppPhase: Equatable {
+    case menu
+    case instructions(Evaluation)
+    case live(Evaluation)
+    case results(Session)
     case error(message: String)
 }
 
 @MainActor
 @Observable
 final class AppState {
-    var phase: AppPhase = .idle
+    var phase: AppPhase = .menu
 
-    func startRecording() { phase = .recording }
-    func stopRecording() { phase = .idle }
+    func select(_ evaluation: Evaluation) { phase = .instructions(evaluation) }
+    func confirm(_ evaluation: Evaluation) { phase = .live(evaluation) }
+    func finished(_ session: Session) { phase = .results(session) }
+    func backToMenu() { phase = .menu }
     func fail(_ message: String) { phase = .error(message: message) }
-    func reset() { phase = .idle }
+    func reset() { phase = .menu }
 }
+
+// pk_test_ keys are publishable by design — safe to embed in the binary.
+// Move to xcconfig when we add a prod key.
+private let clerkPublishableKey = "pk_test_ZGlyZWN0LWhpcHBvLTM4LmNsZXJrLmFjY291bnRzLmRldiQ"
 
 @main
 struct FeralDemoApp: App {
     @State private var state = AppState()
     @State private var sessions = SessionStore()
 
+    init() {
+        // .ambient + .mixWithOthers tells iOS we don't claim the audio session
+        // for our (silent) instruction-video player or camera-capture session.
+        // Without this, AVQueuePlayer's default behavior interrupts whatever
+        // the user is already listening to (Spotify, podcasts, etc.) the
+        // moment any of our screens come up.
+        try? AVAudioSession.sharedInstance().setCategory(.ambient, options: [.mixWithOthers])
+        try? AVAudioSession.sharedInstance().setActive(true, options: [])
+
+        Clerk.configure(publishableKey: clerkPublishableKey)
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environment(state)
                 .environment(sessions)
+                .environment(Clerk.shared)
                 .statusBarHidden(true)
                 .persistentSystemOverlays(.hidden)
         }
@@ -36,15 +59,39 @@ struct FeralDemoApp: App {
 
 struct RootView: View {
     @Environment(AppState.self) private var state
+    @Environment(Clerk.self) private var clerk
 
     var body: some View {
-        switch state.phase {
-        case .idle:
-            RecordScreen()
-        case .recording:
-            LiveRecordingScreen()
-        case .error(let message):
-            ErrorScreen(message: message)
+        if !clerk.isLoaded {
+            LoadingScreen()
+        } else if clerk.user == nil {
+            AuthScreen()
+                .preferredOrientation(.portrait)
+        } else {
+            switch state.phase {
+            case .menu:
+                MenuScreen()
+            case .instructions(let evaluation):
+                InstructionScreen(evaluation: evaluation)
+            case .live(let evaluation):
+                LiveRecordingScreen(evaluation: evaluation)
+            case .results(let session):
+                ResultsScreen(session: session)
+            case .error(let message):
+                ErrorScreen(message: message)
+                    .preferredOrientation(.portrait)
+            }
+        }
+    }
+}
+
+struct LoadingScreen: View {
+    var body: some View {
+        ZStack {
+            Color.white.ignoresSafeArea()
+            ProgressView()
+                .progressViewStyle(.circular)
+                .tint(.black)
         }
     }
 }
@@ -79,7 +126,7 @@ struct ErrorScreen: View {
     }
 }
 
-#Preview("Root — idle") {
+#Preview("Root — menu") {
     RootView()
         .environment(AppState())
         .environment(SessionStore())

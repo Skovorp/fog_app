@@ -7,47 +7,91 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		04CAA19448155FF0C5543AD6 /* WalkingModel.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = E7CE0D6ACD20F84C09D5891C /* WalkingModel.mlpackage */; };
 		0F4BFA792E23880016FD9E6E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D4E1EED2722AF7F4CDCB69A1 /* Assets.xcassets */; };
 		1593F91428FC600E846D00D7 /* CameraPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 707CE10E42A761726CEDECC8 /* CameraPreviewView.swift */; };
+		15B4D1316ECB7BE68611641C /* ClerkKitUI in Frameworks */ = {isa = PBXBuildFile; productRef = ECFC0DF1E298F924C3E31F62 /* ClerkKitUI */; };
+		3220C2182A8D19A4D44A7FDA /* FeralModel.mlpackage.zip in Resources */ = {isa = PBXBuildFile; fileRef = A99A94753A3C4245BCCE8D98 /* FeralModel.mlpackage.zip */; };
 		3354AE3EF401D4CF6AE78F4D /* Preprocess.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03EF53FDA1D7CF3E0B7D869A /* Preprocess.swift */; };
+		33AADD3B5696E96C1FAE040A /* LoopingVideo.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9E3E9CAA9390C0E659F57D9 /* LoopingVideo.swift */; };
 		38EF6BCA5C08DE52EA10B674 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 535A2FF20D0155E99E9BF303 /* App.swift */; };
+		3A6A159BB6E8DE7EA308EF5B /* WalkingDemo.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = A5540580D80CF6C01CACF1C1 /* WalkingDemo.mp4 */; };
 		4590B64C1425ACECBEA34DA4 /* SessionsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = C158A74D7A41D66B36932831 /* SessionsScreen.swift */; };
+		5D8DFF98F6AB3FD6345EAE32 /* AuthScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ECA45F3B70429D4227A62DC /* AuthScreen.swift */; };
+		7D7E1F6AC5FD13260B559C6A /* ClerkKit in Frameworks */ = {isa = PBXBuildFile; productRef = 854FB2A75636847B2B6AAD73 /* ClerkKit */; };
 		8420C18734473B3D4D08C3BC /* SessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53E7527A2B1E701F93D2B842 /* SessionStore.swift */; };
 		848E1D58EAD7F9BF35939255 /* SessionPDF.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83F92E552E25B8D3102A09E6 /* SessionPDF.swift */; };
 		8DB4BBDCDC91E42C5E5AFE50 /* LiveRecordingScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95B152EBFB09E6CC4B0E78A7 /* LiveRecordingScreen.swift */; };
-		9D6473C062EE36C97114CC2F /* RecordScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D90C746E69794BD9C817B9C /* RecordScreen.swift */; };
+		9330DC3A391963775FB1CAD3 /* ChairDemo.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = D1CACFFEA2D1853362418AD8 /* ChairDemo.mp4 */; };
+		96699614603FDC86DFAE0DE7 /* Evaluation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DBDC7465517AB44ED412367 /* Evaluation.swift */; };
 		9F997CA602769AC3E407F02B /* FrameBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3BB486E94E8F123AC8EEB59 /* FrameBuffer.swift */; };
+		AA3C2C1BFEC3443B3D23D450 /* FingerTappingDemo.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = E4F6A95052AF50981C23CA0C /* FingerTappingDemo.mp4 */; };
 		AB21F1DA45857162B01235F2 /* FrameBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DD36AB6C47AEC1C7D2028D9 /* FrameBarView.swift */; };
+		BC6DD154DD2640E557035AA7 /* ChairModel.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 38A40ADA0589FE97B1C9A192 /* ChairModel.mlpackage */; };
+		BCF83BF794CD7357B4D52F6F /* ResultsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0455F207607AB5759DDA20EE /* ResultsScreen.swift */; };
 		BD364C3200FE261BA4281C90 /* Inference.swift in Sources */ = {isa = PBXBuildFile; fileRef = C707269F427F080FCD558632 /* Inference.swift */; };
 		CC355C8F7160E9032F10BE4E /* Session.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F521F335E3528181D88DF40 /* Session.swift */; };
 		CEC242D32FE2AFF440C248DF /* SessionExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C0B54FE76A5456ABC558CE0 /* SessionExport.swift */; };
+		CFAABEC7728AEFEF6889D121 /* MenuScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1055EA3B2A9E3B285592E959 /* MenuScreen.swift */; };
 		D174EE61E5C8E219E7770926 /* CameraSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5AE40D2F47C8E3CCB79D18AE /* CameraSession.swift */; };
 		D5B068F63C7D8C89CF73FFFE /* DeviceInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D2D9BD3D74F7D12942413CD /* DeviceInfo.swift */; };
+		DCE8FC93D035FA5BF07DEE1F /* OrientationLock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15CA3F5B01929ADAD9881A8F /* OrientationLock.swift */; };
+		E2C9B81E1D762AF0ACDB4E08 /* InstructionScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A4C3B6D0C757863A69AFC70 /* InstructionScreen.swift */; };
+		E320178CB78AAC0A28DC3129 /* ShareDataScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6222A60254DBA3D773A6287D /* ShareDataScreen.swift */; };
+		E9FEA3D12423A2632273D161 /* TappingModel.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = A904264024F0FB2E17755082 /* TappingModel.mlpackage */; };
+		F0CB95839DA1F0EFC61ABF49 /* FreezingDemo.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = 5BA11E48EFF3AF01A91148EC /* FreezingDemo.mp4 */; };
 		F4E0CA01E6F6C41C5A20E2B0 /* FeralModel.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 60B026E6E9D8F1755745E6C4 /* FeralModel.mlpackage */; };
 		F94D89DC5D61D85DD6348AFC /* VideoStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74EB05D28521C8F21ABF0231 /* VideoStore.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		03EF53FDA1D7CF3E0B7D869A /* Preprocess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Preprocess.swift; sourceTree = "<group>"; };
+		0455F207607AB5759DDA20EE /* ResultsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultsScreen.swift; sourceTree = "<group>"; };
+		0DBDC7465517AB44ED412367 /* Evaluation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Evaluation.swift; sourceTree = "<group>"; };
+		1055EA3B2A9E3B285592E959 /* MenuScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuScreen.swift; sourceTree = "<group>"; };
+		15CA3F5B01929ADAD9881A8F /* OrientationLock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrientationLock.swift; sourceTree = "<group>"; };
 		1D2D9BD3D74F7D12942413CD /* DeviceInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceInfo.swift; sourceTree = "<group>"; };
 		1DD36AB6C47AEC1C7D2028D9 /* FrameBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameBarView.swift; sourceTree = "<group>"; };
+		1ECA45F3B70429D4227A62DC /* AuthScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthScreen.swift; sourceTree = "<group>"; };
 		1F521F335E3528181D88DF40 /* Session.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Session.swift; sourceTree = "<group>"; };
-		2D90C746E69794BD9C817B9C /* RecordScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordScreen.swift; sourceTree = "<group>"; };
+		38A40ADA0589FE97B1C9A192 /* ChairModel.mlpackage */ = {isa = PBXFileReference; path = ChairModel.mlpackage; sourceTree = "<group>"; };
 		4C0B54FE76A5456ABC558CE0 /* SessionExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionExport.swift; sourceTree = "<group>"; };
 		535A2FF20D0155E99E9BF303 /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
 		53E7527A2B1E701F93D2B842 /* SessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStore.swift; sourceTree = "<group>"; };
 		5AE40D2F47C8E3CCB79D18AE /* CameraSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraSession.swift; sourceTree = "<group>"; };
+		5BA11E48EFF3AF01A91148EC /* FreezingDemo.mp4 */ = {isa = PBXFileReference; path = FreezingDemo.mp4; sourceTree = "<group>"; };
 		60B026E6E9D8F1755745E6C4 /* FeralModel.mlpackage */ = {isa = PBXFileReference; path = FeralModel.mlpackage; sourceTree = "<group>"; };
+		6222A60254DBA3D773A6287D /* ShareDataScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareDataScreen.swift; sourceTree = "<group>"; };
 		707CE10E42A761726CEDECC8 /* CameraPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraPreviewView.swift; sourceTree = "<group>"; };
 		74EB05D28521C8F21ABF0231 /* VideoStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoStore.swift; sourceTree = "<group>"; };
 		83F92E552E25B8D3102A09E6 /* SessionPDF.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionPDF.swift; sourceTree = "<group>"; };
+		8A4C3B6D0C757863A69AFC70 /* InstructionScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstructionScreen.swift; sourceTree = "<group>"; };
 		95B152EBFB09E6CC4B0E78A7 /* LiveRecordingScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveRecordingScreen.swift; sourceTree = "<group>"; };
+		A5540580D80CF6C01CACF1C1 /* WalkingDemo.mp4 */ = {isa = PBXFileReference; path = WalkingDemo.mp4; sourceTree = "<group>"; };
+		A904264024F0FB2E17755082 /* TappingModel.mlpackage */ = {isa = PBXFileReference; path = TappingModel.mlpackage; sourceTree = "<group>"; };
+		A99A94753A3C4245BCCE8D98 /* FeralModel.mlpackage.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; path = FeralModel.mlpackage.zip; sourceTree = "<group>"; };
 		AA27AF1A9DB2A7B673C5775B /* FeralDemo.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = FeralDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B3BB486E94E8F123AC8EEB59 /* FrameBuffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameBuffer.swift; sourceTree = "<group>"; };
 		C158A74D7A41D66B36932831 /* SessionsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionsScreen.swift; sourceTree = "<group>"; };
 		C707269F427F080FCD558632 /* Inference.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Inference.swift; sourceTree = "<group>"; };
+		D1CACFFEA2D1853362418AD8 /* ChairDemo.mp4 */ = {isa = PBXFileReference; path = ChairDemo.mp4; sourceTree = "<group>"; };
 		D4E1EED2722AF7F4CDCB69A1 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		D9E3E9CAA9390C0E659F57D9 /* LoopingVideo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoopingVideo.swift; sourceTree = "<group>"; };
+		E4F6A95052AF50981C23CA0C /* FingerTappingDemo.mp4 */ = {isa = PBXFileReference; path = FingerTappingDemo.mp4; sourceTree = "<group>"; };
+		E7CE0D6ACD20F84C09D5891C /* WalkingModel.mlpackage */ = {isa = PBXFileReference; path = WalkingModel.mlpackage; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A9DA7DBDCC733167AC404AB0 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7D7E1F6AC5FD13260B559C6A /* ClerkKit in Frameworks */,
+				15B4D1316ECB7BE68611641C /* ClerkKitUI in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		2A4705F70C0A411881429BD9 = {
@@ -71,22 +115,37 @@
 			children = (
 				535A2FF20D0155E99E9BF303 /* App.swift */,
 				D4E1EED2722AF7F4CDCB69A1 /* Assets.xcassets */,
+				1ECA45F3B70429D4227A62DC /* AuthScreen.swift */,
 				707CE10E42A761726CEDECC8 /* CameraPreviewView.swift */,
 				5AE40D2F47C8E3CCB79D18AE /* CameraSession.swift */,
+				D1CACFFEA2D1853362418AD8 /* ChairDemo.mp4 */,
+				38A40ADA0589FE97B1C9A192 /* ChairModel.mlpackage */,
 				1D2D9BD3D74F7D12942413CD /* DeviceInfo.swift */,
+				0DBDC7465517AB44ED412367 /* Evaluation.swift */,
 				60B026E6E9D8F1755745E6C4 /* FeralModel.mlpackage */,
+				A99A94753A3C4245BCCE8D98 /* FeralModel.mlpackage.zip */,
+				E4F6A95052AF50981C23CA0C /* FingerTappingDemo.mp4 */,
 				1DD36AB6C47AEC1C7D2028D9 /* FrameBarView.swift */,
 				B3BB486E94E8F123AC8EEB59 /* FrameBuffer.swift */,
+				5BA11E48EFF3AF01A91148EC /* FreezingDemo.mp4 */,
 				C707269F427F080FCD558632 /* Inference.swift */,
+				8A4C3B6D0C757863A69AFC70 /* InstructionScreen.swift */,
 				95B152EBFB09E6CC4B0E78A7 /* LiveRecordingScreen.swift */,
+				D9E3E9CAA9390C0E659F57D9 /* LoopingVideo.swift */,
+				1055EA3B2A9E3B285592E959 /* MenuScreen.swift */,
+				15CA3F5B01929ADAD9881A8F /* OrientationLock.swift */,
 				03EF53FDA1D7CF3E0B7D869A /* Preprocess.swift */,
-				2D90C746E69794BD9C817B9C /* RecordScreen.swift */,
+				0455F207607AB5759DDA20EE /* ResultsScreen.swift */,
 				1F521F335E3528181D88DF40 /* Session.swift */,
 				4C0B54FE76A5456ABC558CE0 /* SessionExport.swift */,
 				83F92E552E25B8D3102A09E6 /* SessionPDF.swift */,
 				C158A74D7A41D66B36932831 /* SessionsScreen.swift */,
 				53E7527A2B1E701F93D2B842 /* SessionStore.swift */,
+				6222A60254DBA3D773A6287D /* ShareDataScreen.swift */,
+				A904264024F0FB2E17755082 /* TappingModel.mlpackage */,
 				74EB05D28521C8F21ABF0231 /* VideoStore.swift */,
+				A5540580D80CF6C01CACF1C1 /* WalkingDemo.mp4 */,
+				E7CE0D6ACD20F84C09D5891C /* WalkingModel.mlpackage */,
 			);
 			path = FeralDemo;
 			sourceTree = "<group>";
@@ -100,6 +159,7 @@
 			buildPhases = (
 				9AF899C2A31DE2D60D563498 /* Sources */,
 				79CCB9DE8A035DD75C8A6B97 /* Resources */,
+				A9DA7DBDCC733167AC404AB0 /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -107,6 +167,8 @@
 			);
 			name = FeralDemo;
 			packageProductDependencies = (
+				854FB2A75636847B2B6AAD73 /* ClerkKit */,
+				ECFC0DF1E298F924C3E31F62 /* ClerkKitUI */,
 			);
 			productName = FeralDemo;
 			productReference = AA27AF1A9DB2A7B673C5775B /* FeralDemo.app */;
@@ -136,6 +198,9 @@
 			);
 			mainGroup = 2A4705F70C0A411881429BD9;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				FC8D3A14301AE7008A93FCB8 /* XCRemoteSwiftPackageReference "clerk-ios" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 4885FA26521FC098119F112E /* Products */;
 			projectDirPath = "";
@@ -152,6 +217,11 @@
 			buildActionMask = 2147483647;
 			files = (
 				0F4BFA792E23880016FD9E6E /* Assets.xcassets in Resources */,
+				9330DC3A391963775FB1CAD3 /* ChairDemo.mp4 in Resources */,
+				3220C2182A8D19A4D44A7FDA /* FeralModel.mlpackage.zip in Resources */,
+				AA3C2C1BFEC3443B3D23D450 /* FingerTappingDemo.mp4 in Resources */,
+				F0CB95839DA1F0EFC61ABF49 /* FreezingDemo.mp4 in Resources */,
+				3A6A159BB6E8DE7EA308EF5B /* WalkingDemo.mp4 in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -163,22 +233,32 @@
 			buildActionMask = 2147483647;
 			files = (
 				38EF6BCA5C08DE52EA10B674 /* App.swift in Sources */,
+				5D8DFF98F6AB3FD6345EAE32 /* AuthScreen.swift in Sources */,
 				1593F91428FC600E846D00D7 /* CameraPreviewView.swift in Sources */,
 				D174EE61E5C8E219E7770926 /* CameraSession.swift in Sources */,
+				BC6DD154DD2640E557035AA7 /* ChairModel.mlpackage in Sources */,
 				D5B068F63C7D8C89CF73FFFE /* DeviceInfo.swift in Sources */,
+				96699614603FDC86DFAE0DE7 /* Evaluation.swift in Sources */,
 				F4E0CA01E6F6C41C5A20E2B0 /* FeralModel.mlpackage in Sources */,
 				AB21F1DA45857162B01235F2 /* FrameBarView.swift in Sources */,
 				9F997CA602769AC3E407F02B /* FrameBuffer.swift in Sources */,
 				BD364C3200FE261BA4281C90 /* Inference.swift in Sources */,
+				E2C9B81E1D762AF0ACDB4E08 /* InstructionScreen.swift in Sources */,
 				8DB4BBDCDC91E42C5E5AFE50 /* LiveRecordingScreen.swift in Sources */,
+				33AADD3B5696E96C1FAE040A /* LoopingVideo.swift in Sources */,
+				CFAABEC7728AEFEF6889D121 /* MenuScreen.swift in Sources */,
+				DCE8FC93D035FA5BF07DEE1F /* OrientationLock.swift in Sources */,
 				3354AE3EF401D4CF6AE78F4D /* Preprocess.swift in Sources */,
-				9D6473C062EE36C97114CC2F /* RecordScreen.swift in Sources */,
+				BCF83BF794CD7357B4D52F6F /* ResultsScreen.swift in Sources */,
 				CC355C8F7160E9032F10BE4E /* Session.swift in Sources */,
 				CEC242D32FE2AFF440C248DF /* SessionExport.swift in Sources */,
 				848E1D58EAD7F9BF35939255 /* SessionPDF.swift in Sources */,
 				8420C18734473B3D4D08C3BC /* SessionStore.swift in Sources */,
 				4590B64C1425ACECBEA34DA4 /* SessionsScreen.swift in Sources */,
+				E320178CB78AAC0A28DC3129 /* ShareDataScreen.swift in Sources */,
+				E9FEA3D12423A2632273D161 /* TappingModel.mlpackage in Sources */,
 				F94D89DC5D61D85DD6348AFC /* VideoStore.swift in Sources */,
+				04CAA19448155FF0C5543AD6 /* WalkingModel.mlpackage in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -374,6 +454,30 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		FC8D3A14301AE7008A93FCB8 /* XCRemoteSwiftPackageReference "clerk-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/clerk/clerk-ios";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.1.3;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		854FB2A75636847B2B6AAD73 /* ClerkKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FC8D3A14301AE7008A93FCB8 /* XCRemoteSwiftPackageReference "clerk-ios" */;
+			productName = ClerkKit;
+		};
+		ECFC0DF1E298F924C3E31F62 /* ClerkKitUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FC8D3A14301AE7008A93FCB8 /* XCRemoteSwiftPackageReference "clerk-ios" */;
+			productName = ClerkKitUI;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 90AD9F7C509DB3D54BF17FDF /* Project object */;
 }

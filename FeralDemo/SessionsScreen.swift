@@ -8,16 +8,12 @@ struct SessionsScreen: View {
     @State private var exportError: String?
     @State private var exportingIDs: Set<UUID> = []
     @State private var pendingDelete: Session?
-    @State private var showingClearAllConfirm = false
-    @State private var showingExportAllDialog = false
-    @State private var isExportingAll = false
     @State private var playingVideo: PlayingVideo?
     @AppStorage("skipDeleteConfirmation") private var skipDeleteConfirmation = false
     @AppStorage("sessionsTapHintSeen") private var tapHintSeen = false
 
     private let columns: [GridItem] = [
-        GridItem(.flexible(), spacing: 24),
-        GridItem(.flexible(), spacing: 24),
+        GridItem(.flexible(), spacing: 0),
     ]
 
     var body: some View {
@@ -57,48 +53,6 @@ struct SessionsScreen: View {
         .navigationTitle("Previous sessions")
         .navigationBarTitleDisplayMode(.large)
         .toolbar(.visible, for: .navigationBar)
-        .toolbar {
-            if !store.sessions.isEmpty {
-                ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 16) {
-                        Button {
-                            showingExportAllDialog = true
-                        } label: {
-                            if isExportingAll {
-                                HStack(spacing: 6) {
-                                    ProgressView().controlSize(.small)
-                                    Text("Exporting…")
-                                }
-                                .font(.system(size: 15, weight: .medium, design: .rounded))
-                            } else {
-                                Text("Export all")
-                                    .font(.system(size: 15, weight: .medium, design: .rounded))
-                            }
-                        }
-                        .disabled(isExportingAll)
-
-                        Button(role: .destructive) {
-                            showingClearAllConfirm = true
-                        } label: {
-                            Text("Clear all")
-                                .font(.system(size: 15, weight: .medium, design: .rounded))
-                                .foregroundStyle(.red)
-                        }
-                    }
-                }
-            }
-        }
-        .alert(
-            "Export all sessions",
-            isPresented: $showingExportAllDialog
-        ) {
-            Button("Human-readable PDF") { exportAll(.pdf) }
-            Button("Machine-readable JSON") { exportAll(.json) }
-            Button("Videos (ZIP)") { exportAll(.videos) }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("Combine all \(store.sessions.count) sessions into one file.")
-        }
         .sheet(item: $pendingExport) { item in
             ShareSheet(items: [item.url])
         }
@@ -126,14 +80,6 @@ struct SessionsScreen: View {
         } message: { session in
             Text("\"\(session.displayTitle)\" — \(session.totalFrames) frames will be permanently removed.")
         }
-        .alert("Clear all sessions?", isPresented: $showingClearAllConfirm) {
-            Button("Cancel", role: .cancel) { }
-            Button("Clear all", role: .destructive) {
-                store.clear()
-            }
-        } message: {
-            Text("All \(store.sessions.count) sessions will be permanently removed. This can't be undone.")
-        }
     }
 
     private var errorBinding: Binding<Bool> {
@@ -158,38 +104,6 @@ struct SessionsScreen: View {
         }
     }
 
-    private enum ExportAllFormat { case pdf, json, videos }
-
-    private func exportAll(_ format: ExportAllFormat) {
-        guard !isExportingAll else { return }
-        isExportingAll = true
-        let snapshot = store.sessions
-        let fallbackDevice = DeviceInfo.current()  // captured on main
-        Task.detached(priority: .userInitiated) {
-            let result: Result<URL, Error>
-            do {
-                let url: URL
-                switch format {
-                case .pdf:    url = try SessionExport.generateAllPDF(snapshot)
-                case .json:   url = try SessionExport.generateAllJSON(snapshot, fallbackDevice: fallbackDevice)
-                case .videos: url = try SessionExport.generateAllVideosZIP(snapshot)
-                }
-                result = .success(url)
-            } catch {
-                result = .failure(error)
-            }
-            await MainActor.run {
-                isExportingAll = false
-                switch result {
-                case .success(let url):
-                    pendingExport = ExportItem(url: url)
-                case .failure(let error):
-                    exportError = error.localizedDescription
-                }
-            }
-        }
-    }
-
     // MARK: First-visit hint
 
     private var tapHintBanner: some View {
@@ -197,9 +111,11 @@ struct SessionsScreen: View {
             Image(systemName: "play.rectangle.fill")
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(.white)
-            Text("Tap a card to watch the session video")
+            Text("Tap a row to watch the video")
                 .font(.system(size: 14, weight: .medium, design: .rounded))
                 .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
             Spacer(minLength: 0)
             Button {
                 withAnimation { tapHintSeen = true }
@@ -236,7 +152,7 @@ struct SessionsScreen: View {
             Text("No sessions yet")
                 .font(.system(size: 18, weight: .medium, design: .rounded))
                 .foregroundStyle(.primary)
-            Text("Hit Start on the home screen to record one.")
+            Text("Pick a test on the home screen to record one.")
                 .font(.system(size: 13, weight: .regular, design: .rounded))
                 .foregroundStyle(.secondary)
         }
@@ -302,16 +218,28 @@ private struct SessionCard: View {
                             .lineLimit(1)
                     }
 
-                    HStack(alignment: .firstTextBaseline, spacing: 14) {
-                        statChip(icon: "film.stack",
-                                 text: "\(session.totalFrames) frames")
-                        statChip(icon: session.fogCount == 0 ? "checkmark.circle.fill" : "exclamationmark.triangle.fill",
-                                 text: String(format: "%.1f%% fog", session.fogPct),
-                                 tint: session.fogCount == 0 ? .green : .red)
-                        if let bytes = videoSizeBytes {
-                            statChip(icon: "video", text: VideoStore.formatBytes(bytes))
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 14) {
+                            statChip(icon: session.effectiveEvaluation.symbolName,
+                                     text: session.effectiveEvaluation.displayName)
+                            statChip(icon: "film.stack",
+                                     text: "\(session.totalFrames) frames")
+                            Spacer(minLength: 0)
                         }
-                        Spacer(minLength: 0)
+                        HStack(spacing: 14) {
+                            if session.effectiveEvaluation.headlinesFogPct {
+                                statChip(icon: session.fogCount == 0 ? "checkmark.circle.fill" : "exclamationmark.triangle.fill",
+                                         text: String(format: "%.1f%% fog", session.fogPct),
+                                         tint: session.fogCount == 0 ? .green : .red)
+                            } else {
+                                statChip(icon: "gauge.with.needle",
+                                         text: String(format: "score %.2f", session.updrsScore))
+                            }
+                            if let bytes = videoSizeBytes {
+                                statChip(icon: "video", text: VideoStore.formatBytes(bytes))
+                            }
+                            Spacer(minLength: 0)
+                        }
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -373,16 +301,18 @@ private struct SessionCard: View {
     }
 
     private func statChip(icon: String, text: String, tint: Color = .secondary) -> some View {
-        HStack(spacing: 5) {
+        HStack(spacing: 6) {
             Image(systemName: icon)
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: 13, weight: .semibold))
             Text(text)
-                .font(.system(size: 12, weight: .regular, design: .rounded))
+                .font(.system(size: 14, weight: .semibold, design: .rounded))
         }
         .foregroundStyle(tint)
         .lineLimit(1)
+        .fixedSize(horizontal: true, vertical: false)
     }
 }
+
 
 struct ShareSheet: UIViewControllerRepresentable {
     let items: [Any]

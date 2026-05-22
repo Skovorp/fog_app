@@ -1,0 +1,112 @@
+feral — Privacy Policy
+
+Effective date: May 4, 2026
+Contact: jacopo.razza@gmail.com
+
+This is the privacy policy for "feral" (the "App"), an iOS application that
+scores freezing of gait from a turn-in-place test. We take a "no surprises"
+approach: nothing leaves your device unless you explicitly choose to share
+it.
+
+────────────────────────────────────────────────────────────────────────
+1. WHAT THE APP ACCESSES
+────────────────────────────────────────────────────────────────────────
+
+To do its job, the App accesses the following on the device you install
+it on:
+
+  • Rear camera — used to capture short video while you record a session.
+    The frames are sent directly to an on-device Core ML model that
+    produces per-frame freezing-of-gait probabilities. Frames are NOT
+    uploaded to any server.
+  • Local storage (the App's sandbox in Application Support) — stores
+    the recorded video file, the per-frame scores, the session start/end
+    times, and basic device metadata (model identifier, iOS version,
+    app version, device name) for each session.
+
+The App does NOT access your photo library, contacts, location,
+microphone, calendar, health data, or any other category of personal
+information.
+
+────────────────────────────────────────────────────────────────────────
+2. WHAT LEAVES YOUR DEVICE
+────────────────────────────────────────────────────────────────────────
+
+By default: nothing. The App does not connect to any network endpoint
+operated by us. There are no analytics, no crash reporters, no advertising
+SDKs, and no third-party services bundled in the App.
+
+Data leaves your device ONLY when you explicitly tap one of the export
+or share buttons:
+
+  • "Export PDF" on a session card — generates a PDF in a temporary
+    location and opens the iOS share sheet. You then choose where it
+    goes (AirDrop, Mail, Files, a specific app, etc.).
+  • "Export all" → "Human-readable PDF / Machine-readable JSON / Videos
+    (ZIP)" — same flow, applied to every saved session.
+  • Tapping the share button on a session video in the player.
+
+We are not a recipient of any of this data. Where it ends up is governed
+by the privacy policy of whichever destination app you pick.
+
+────────────────────────────────────────────────────────────────────────
+3. ON-DEVICE INFERENCE
+────────────────────────────────────────────────────────────────────────
+
+The Core ML model that scores your video runs entirely on your iPhone's
+Neural Engine and CPU/GPU. It does not require an internet connection
+and does not transmit frames or scores anywhere. You can put the device
+in airplane mode and the App will still work.
+
+────────────────────────────────────────────────────────────────────────
+4. DEVICE METADATA STORED PER SESSION
+────────────────────────────────────────────────────────────────────────
+
+Each saved session includes a small block of device metadata so that a
+report exported months later still reflects the device that recorded it:
+
+  • Device model (e.g. "iPhone")
+  • Device name (the user-set name, e.g. "Jacopo's iPhone")
+  • Device identifier (e.g. "iPhone16,2")
+  • iOS system name and version (e.g. "iOS 17.4")
+  • App version and build number
+
+This metadata is stored only in the App's local sandbox alongside the
+session's predictions and video file. It is included in any report you
+explicitly export. We do not transmit it.
+
+────────────────────────────────────────────────────────────────────────
+5. DELETING YOUR DATA
+────────────────────────────────────────────────────────────────────────
+
+Two controls inside the App fully erase data from your device:
+
+  • Per-session delete (trash button on a session card) — removes that
+    session's predictions, metadata, and video file.
+  • "Clear all" (toolbar on the Previous Sessions screen) — removes
+    every session.
+
+Uninstalling the App also deletes its entire sandbox, including all
+saved sessions and videos.
+
+────────────────────────────────────────────────────────────────────────
+6. CHILDREN
+────────────────────────────────────────────────────────────────────────
+
+The App is not directed at children under 13 and does not knowingly
+collect any data from them.
+
+────────────────────────────────────────────────────────────────────────
+7. CHANGES TO THIS POLICY
+────────────────────────────────────────────────────────────────────────
+
+If we change this policy, the updated version will be posted at
+https://www.getferal.ai/appprivacypolicy with a new "Effective date".
+Material changes will be highlighted in the App's release notes.
+
+────────────────────────────────────────────────────────────────────────
+8. CONTACT
+────────────────────────────────────────────────────────────────────────
+
+Questions about this policy or how the App handles data:
+  jacopo.razza@gmail.com

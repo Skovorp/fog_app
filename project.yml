@@ -12,6 +12,11 @@ settings:
     DEVELOPMENT_TEAM: "V5B6TWY55Y"
     CODE_SIGN_STYLE: Automatic
 
+packages:
+  Clerk:
+    url: https://github.com/clerk/clerk-ios
+    from: "1.1.3"
+
 targets:
   FeralDemo:
     type: application
@@ -22,6 +27,11 @@ targets:
         excludes:
           - "Info.plist"
           - "FeralDemo.entitlements"
+    dependencies:
+      - package: Clerk
+        product: ClerkKit
+      - package: Clerk
+        product: ClerkKitUI
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.razza.feraldemov2ojnvdfijvn

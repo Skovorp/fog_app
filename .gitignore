@@ -15,11 +15,20 @@ build/
 *.dSYM.zip
 *.dSYM/
 
-# Trained CoreML model — exceeds GitHub's 100 MB limit. Re-export with:
+# Trained CoreML models — each weight.bin exceeds GitHub's 100 MB limit.
+# Re-export with:
 #   cd ../../feral && python -m feral.export_coreml \
 #     --checkpoint <your.pt> --input-size 256 --num-frames 16 \
-#     --output ../yc_demo/v2/FeralDemo/FeralModel.mlpackage
+#     --output ../yc_demo/v2/FeralDemo/<Name>Model.mlpackage
 FeralDemo/FeralModel.mlpackage/
+FeralDemo/ChairModel.mlpackage/
+FeralDemo/TappingModel.mlpackage/
+FeralDemo/WalkingModel.mlpackage/
+*.mlpackage.zip
+
+# Local backup files / dirs
+*.bak
+*.bak.*
 
 # App Store screenshot output (keep the script, drop the renders)
 appstore/*.png

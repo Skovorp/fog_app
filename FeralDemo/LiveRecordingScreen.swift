@@ -1,17 +1,25 @@
 import SwiftUI
 import AVFoundation
 
-/// Live recording screen: camera preview fills the whole landscape canvas,
-/// the sliding score bar is overlaid edge-to-edge at the bottom, and a Stop
-/// button sits in the top-right corner. Pinch on the preview to zoom in/out
-/// like the iOS Camera app.
+/// Live recording screen. Three substates:
+///   1. **Loading** — camera + model coming up; centered spinner overlay.
+///   2. **Preview** — camera preview + score bar are live. Inference runs so
+///      the user can see the model working before they commit. A giant Start
+///      button sits dead-centre. Nothing is being saved.
+///   3. **Recording** — user tapped Start. The .mp4 begins, the index of the
+///      first "saved" frame is captured, and Stop appears top-right. The score
+///      bar keeps flowing without resetting — visual continuity matters.
 ///
-/// While the model is being loaded (`isReady == false`), a centered spinner +
-/// "Preparing model…" overlay covers the black background — without it the
-/// app appears frozen on first Start tap (model load is ~1–2 s).
+/// "Save from Start to Stop":
+///   - The .mp4 contains only Start→Stop frames (CameraSession.beginRecording
+///     is called only on the Start tap).
+///   - On Stop we slice `frameBuffer.frames[recordingStartFrameIndex...]`
+///     before writing the Session so preview-window scores aren't persisted.
 struct LiveRecordingScreen: View {
     @Environment(AppState.self) private var appState
     @Environment(SessionStore.self) private var sessions
+    let evaluation: Evaluation
+
     @State private var camera = CameraSession()
     @State private var frameBuffer: FrameBuffer?
     @State private var inference: Inference?
@@ -19,10 +27,17 @@ struct LiveRecordingScreen: View {
     @State private var baseZoom: CGFloat = 1.0
     @State private var currentZoom: CGFloat = 1.0
     @State private var startedAt: Date = Date()
-    @State private var isReady: Bool = false
+    @State private var isModelLoaded: Bool = false
+    @State private var isCameraReady: Bool = false
+    @State private var isRecording: Bool = false
     @State private var sessionID: UUID = UUID()
     @State private var videoFilename: String?
     @State private var isStopping: Bool = false
+    /// Index in `frameBuffer.frames` of the first frame that counts toward the
+    /// saved Session. Frames before this are preview only.
+    @State private var recordingStartFrameIndex: Int = 0
+
+    private var isReady: Bool { isModelLoaded && isCameraReady }
 
     var body: some View {
         ZStack {
@@ -40,10 +55,10 @@ struct LiveRecordingScreen: View {
             CameraPreviewView(cameraSession: camera)
                 .ignoresSafeArea()
                 .gesture(zoomGesture)
-                .opacity(isReady ? 1 : 0)
+                .opacity(isCameraReady ? 1 : 0)
             #endif
 
-            // Frame bar — edge-to-edge, ignores safe area on all sides
+            // Frame bar — visible as soon as we have any scored frames.
             VStack {
                 Spacer()
                 if let frameBuffer, isReady {
@@ -52,16 +67,16 @@ struct LiveRecordingScreen: View {
             }
             .ignoresSafeArea()
 
-            // Stop button + zoom indicator — respect safe area
+            // Top toolbar — zoom badge left, Stop button right (recording only).
             VStack {
                 HStack {
-                    if frameBuffer != nil, isReady {
+                    if isReady {
                         zoomBadge
                             .padding(.leading, 20)
                             .padding(.top, 16)
                     }
                     Spacer()
-                    if isReady {
+                    if isRecording {
                         stopButton
                             .padding(.trailing, 20)
                             .padding(.top, 16)
@@ -70,14 +85,20 @@ struct LiveRecordingScreen: View {
                 Spacer()
             }
 
+            // Center Start button — only in preview mode.
+            if isReady && !isRecording {
+                centerStartButton
+            }
+
             if !isReady {
                 loadingOverlay
             }
         }
         .statusBarHidden(true)
         .persistentSystemOverlays(.hidden)
-        .task { await startSession() }
+        .task { await prepareSession() }
         .onDisappear { stopSession() }
+        .preferredOrientation(.landscape)
     }
 
     private var loadingOverlay: some View {
@@ -86,7 +107,7 @@ struct LiveRecordingScreen: View {
                 .progressViewStyle(.circular)
                 .tint(.white)
                 .scaleEffect(1.4)
-            Text("Preparing model…")
+            Text("Preparing camera & model…")
                 .font(.system(size: 16, weight: .medium, design: .rounded))
                 .foregroundStyle(.white.opacity(0.85))
             Text("This takes a couple of seconds the first time.")
@@ -98,13 +119,32 @@ struct LiveRecordingScreen: View {
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
+    /// Big red circle in the dead-centre of the screen — sized like a typical
+    /// camera-app record control.
+    private var centerStartButton: some View {
+        Button {
+            startRecording()
+        } label: {
+            ZStack {
+                Circle()
+                    .fill(Color.red)
+                    .frame(width: 130, height: 130)
+                Text("Start")
+                    .font(.system(size: 26, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+            }
+            .shadow(color: .black.opacity(0.35), radius: 16, x: 0, y: 6)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Start recording")
+    }
+
     private var stopButton: some View {
         Button {
             guard !isStopping else { return }
             isStopping = true
             Task { @MainActor in
                 await stopAndSave()
-                appState.stopRecording()
             }
         } label: {
             HStack(spacing: 6) {
@@ -152,42 +192,57 @@ struct LiveRecordingScreen: View {
             }
     }
 
-    @MainActor
-    private func startSession() async {
-        // Allocate the session ID + matching video filename up front so the
-        // AVAssetWriter can write directly to its final on-disk path. We only
-        // hand a URL to the camera in the device build; the simulator path
-        // doesn't capture real frames.
-        sessionID = UUID()
-        let filename = "\(sessionID.uuidString).mp4"
-        videoFilename = filename
+    // MARK: Session lifecycle
 
-        let inf: Inference?
-        do {
-            inf = try await Task.detached { try Inference() }.value
-        } catch {
-            #if targetEnvironment(simulator)
-            inf = nil
-            #else
-            appState.fail("Failed to load model: \(error.localizedDescription)")
-            return
-            #endif
-        }
-        let buf = FrameBuffer(inference: inf) { error in
-            appState.fail("Inference failed: \(error.localizedDescription)")
-        }
-        self.inference = inf
-        self.frameBuffer = buf
-        self.startedAt = Date()
+    @MainActor
+    private func prepareSession() async {
+        sessionID = UUID()
+        videoFilename = "\(sessionID.uuidString).mp4"
+
+        // Model load — async, parallel with camera start. The model is
+        // selected per-evaluation; each maps to its own .mlpackage in the
+        // bundle and has its own I/O contract (per-frame probs for FoG,
+        // chunk-level scalar for the regression heads).
+        let pickedEvaluation = evaluation
+        let inferenceTask = Task.detached { try Inference(for: pickedEvaluation) }
 
         #if targetEnvironment(simulator)
         videoFilename = nil  // simulator never produces a video file
+        isCameraReady = true
+        do {
+            inference = try await inferenceTask.value
+        } catch {
+            inference = nil
+        }
+        let buf = FrameBuffer(inference: inference) { error in
+            appState.fail("Inference failed: \(error.localizedDescription)")
+        }
+        frameBuffer = buf
+        isModelLoaded = true
+        // Begin preview-mode synthetic stream so the bar runs immediately.
         startSimulatorStream(into: buf)
-        isReady = true
         #else
-        let videoURL = VideoStore.fileURL(for: filename)
-        await camera.start(videoURL: videoURL) { buffer in
-            buf.append(buffer: buffer)
+        // Construct the FrameBuffer and wire it up before starting the camera
+        // so the very first frame goes in.
+        do {
+            inference = try await inferenceTask.value
+            isModelLoaded = true
+        } catch {
+            appState.fail("Failed to load model: \(error.localizedDescription)")
+            return
+        }
+        let buf = FrameBuffer(inference: inference) { error in
+            appState.fail("Inference failed: \(error.localizedDescription)")
+        }
+        frameBuffer = buf
+
+        // Start the camera in preview-only mode (no mp4 URL yet). Every frame
+        // flows into the FrameBuffer so the bar populates immediately; the
+        // mp4 writer is attached later on the Start tap.
+        await camera.start(videoURL: nil) { buffer in
+            Task { @MainActor in
+                buf.append(buffer: buffer)
+            }
         }
         if case .failed(let msg) = camera.phase {
             appState.fail(msg)
@@ -195,11 +250,28 @@ struct LiveRecordingScreen: View {
         }
         baseZoom = camera.zoomFactor
         currentZoom = camera.zoomFactor
-        isReady = true
+        isCameraReady = true
         #endif
     }
 
-    /// Tap-Stop path: stop capture (await mp4 finalization), then persist.
+    @MainActor
+    private func startRecording() {
+        guard isReady, !isRecording, let buf = frameBuffer else { return }
+        // Anchor the save window to the current frame count — everything
+        // accumulated during preview is dropped at save time.
+        recordingStartFrameIndex = buf.frames.count
+        startedAt = Date()
+        isRecording = true
+
+        #if !targetEnvironment(simulator)
+        if let filename = videoFilename {
+            camera.beginRecording(to: VideoStore.fileURL(for: filename))
+        }
+        #endif
+    }
+
+    /// Tap-Stop path: stop capture (await mp4 finalization), then persist and
+    /// hand the saved Session to AppState so the Results screen can render.
     @MainActor
     private func stopAndSave() async {
         simTimer?.invalidate()
@@ -207,7 +279,11 @@ struct LiveRecordingScreen: View {
         #if !targetEnvironment(simulator)
         await camera.stop()
         #endif
-        saveCurrentSession()
+        guard let session = saveCurrentSession() else {
+            appState.backToMenu()
+            return
+        }
+        appState.finished(session)
     }
 
     /// onDisappear cleanup: best-effort, don't block.
@@ -219,35 +295,41 @@ struct LiveRecordingScreen: View {
         #endif
     }
 
-    /// Snapshot the per-frame scores collected during this run and persist as
-    /// a `Session`. With 50% chunk overlap, every frame except the first 32
-    /// (only chunk 0 covers them) and the last <chunk-shift> (waiting on the
-    /// next overlapping chunk) gets two predictions. We truncate the saved
-    /// scores at the last frame with `scoreCount == 2` per the export rule.
-    private func saveCurrentSession() {
+    /// Snapshot the per-frame scores from the recording window and persist as
+    /// a `Session`. Returns nil if the recording was too short to produce any
+    /// scored frames. The required scoreCount differs by evaluation: FoG
+    /// expects scoreCount==2 (two overlapping chunks averaged), regression
+    /// heads emit one chunk-level scalar so scoreCount==1 is sufficient.
+    @discardableResult
+    private func saveCurrentSession() -> Session? {
         guard let frameBuffer else {
             cleanupOrphanVideo()
-            return
+            return nil
         }
         let allFrames = frameBuffer.frames
-        guard let lastTwoIdx = allFrames.lastIndex(where: { $0.scoreCount == 2 }) else {
+        let windowStart = min(recordingStartFrameIndex, allFrames.count)
+        let window = allFrames[windowStart...]
+        let minScoreCount = evaluation.outputIsPerFrame ? 2 : 1
+        guard let lastFullyScoredIdx = window.lastIndex(where: { $0.scoreCount >= minScoreCount }) else {
             cleanupOrphanVideo()
-            return
+            return nil
         }
-        let scored = allFrames[0...lastTwoIdx].compactMap { $0.score }
-        guard !scored.isEmpty else {
+        let saved = allFrames[windowStart...lastFullyScoredIdx].compactMap { $0.score }
+        guard !saved.isEmpty else {
             cleanupOrphanVideo()
-            return
+            return nil
         }
         let session = Session(
             id: sessionID,
             startedAt: startedAt,
             endedAt: Date(),
-            scores: scored,
+            scores: saved,
             device: DeviceInfo.current(),
-            videoFilename: videoFilename
+            videoFilename: videoFilename,
+            evaluation: evaluation
         )
         sessions.add(session)
+        return session
     }
 
     /// If the recording was too short to score (no frame got 2 predictions),
@@ -285,7 +367,7 @@ struct LiveRecordingScreen: View {
 }
 
 #Preview("LiveRecording — sim") {
-    LiveRecordingScreen()
+    LiveRecordingScreen(evaluation: .freezingOfGait)
         .environment(AppState())
         .environment(SessionStore())
 }
