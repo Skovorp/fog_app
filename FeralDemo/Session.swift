@@ -17,8 +17,49 @@ struct Session: Identifiable, Codable, Hashable {
     /// Which MDS-UPDRS item the user was performing. Optional for backward
     /// compatibility — sessions saved before the multi-evaluation menu decode
     /// with `evaluation == nil` and are treated as `.freezingOfGait` via
-    /// `effectiveEvaluation`.
+    /// `effectiveEvaluation`. Unknown raw values (e.g., a removed enum case)
+    /// also decode to nil — see custom `init(from:)` — so retiring an
+    /// evaluation doesn't poison the whole `[Session]` decode.
     let evaluation: Evaluation?
+
+    init(
+        id: UUID,
+        startedAt: Date,
+        endedAt: Date,
+        scores: [Float],
+        device: DeviceInfo?,
+        videoFilename: String?,
+        evaluation: Evaluation?
+    ) {
+        self.id = id
+        self.startedAt = startedAt
+        self.endedAt = endedAt
+        self.scores = scores
+        self.device = device
+        self.videoFilename = videoFilename
+        self.evaluation = evaluation
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, startedAt, endedAt, scores, device, videoFilename, evaluation
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try c.decode(UUID.self, forKey: .id)
+        self.startedAt = try c.decode(Date.self, forKey: .startedAt)
+        self.endedAt = try c.decode(Date.self, forKey: .endedAt)
+        self.scores = try c.decode([Float].self, forKey: .scores)
+        self.device = try c.decodeIfPresent(DeviceInfo.self, forKey: .device)
+        self.videoFilename = try c.decodeIfPresent(String.self, forKey: .videoFilename)
+        // Tolerate unknown raw values (case removed in a later build) by
+        // falling back to nil rather than failing the whole array decode.
+        if let raw = try c.decodeIfPresent(String.self, forKey: .evaluation) {
+            self.evaluation = Evaluation(rawValue: raw)
+        } else {
+            self.evaluation = nil
+        }
+    }
 
     /// Threshold above which a frame is counted as "fog". 0.5 matches the
     /// model's default operating point — RESULTS.md run_06 (the no-pool
