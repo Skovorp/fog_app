@@ -196,6 +196,7 @@ final class FrameBuffer {
         // session drain knows to re-score them. Their pixel buffers can be
         // released right after.
         var s = nextChunkStart
+        let stashedThisKick = (s < latestReadyStart) ? (latestReadyStart - s) / chunk : 0
         while s < latestReadyStart {
             stash.append(s)
             s += chunk
@@ -217,6 +218,20 @@ final class FrameBuffer {
         inflightStart = start
         nextChunkStart = start + chunk
         dropOldBuffers()
+        // Verification log: `picked` is what we just kicked off; `newest`
+        // is the highest chunk-start that was fully captured at this moment.
+        // They should ALWAYS be equal — the scheduler picks the latest
+        // ready chunk every time. `stashed_this_kick` grows whenever
+        // inference falls behind by ≥2 chunks. Watch in Xcode's device
+        // console or `idevicesyslog | grep '\[Scheduler\]'`.
+        let newest = ((frames.count / chunk) - 1) * chunk
+        print(
+            "[Scheduler] picked=\(start / chunk)" +
+            " newest=\(newest / chunk)" +
+            " stashed_this_kick=\(stashedThisKick)" +
+            " stash_total=\(stash.count)" +
+            " total_frames=\(frames.count)"
+        )
 
         inflightTask = Task.detached { [weak self] in
             do {
