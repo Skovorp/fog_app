@@ -76,18 +76,21 @@ struct DataSharingScreen: View {
     }
 
     private var mainContent: some View {
-        ZStack {
-            Color.white.ignoresSafeArea()
-            ScrollView {
-                VStack(spacing: 20) {
-                    syncSection
-                    observersSection
-                }
-                .padding(.horizontal, 24)
-                .padding(.top, 8)
-                .padding(.bottom, 24)
+        // The ScrollView has to be the direct content of the navigation
+        // (not wrapped in a ZStack with a full-bleed background) so the
+        // navigation bar can track its scroll offset. Without this the
+        // large title collapses to inline on the first scroll-down and
+        // never returns when the user scrolls back up.
+        ScrollView {
+            VStack(spacing: 20) {
+                syncSection
+                observersSection
             }
+            .padding(.horizontal, 24)
+            .padding(.top, 8)
+            .padding(.bottom, 24)
         }
+        .background(Color.white.ignoresSafeArea())
     }
 
     private var revokeAlertBinding: Binding<Bool> {
@@ -221,37 +224,62 @@ struct DataSharingScreen: View {
 
     @ViewBuilder
     private var observersContent: some View {
-        switch loadState {
-        case .loading:
-            HStack { Spacer(); ProgressView().progressViewStyle(.circular).tint(.lucheInk); Spacer() }
-                .padding(.vertical, 28)
+        // Crossfade between phases so the loading → loaded swap doesn't
+        // flash the list in. The spinner reserves at least a row-and-a-
+        // half of height (`minHeight: 96`) so the surrounding ScrollView
+        // doesn't jump when the rows materialize.
+        Group {
+            switch loadState {
+            case .loading:
+                HStack {
+                    Spacer()
+                    ProgressView().progressViewStyle(.circular).tint(.lucheInk)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, minHeight: 96)
+                .transition(.opacity)
 
-        case .error(let message):
-            VStack(spacing: 10) {
-                Image(systemName: "exclamationmark.triangle")
-                    .font(.system(size: 28, weight: .light))
-                    .foregroundStyle(.secondary)
-                Text(message)
-                    .font(.system(size: 13, weight: .regular, design: .rounded))
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                Button("Try again") { Task { await load() } }
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.lucheInk)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 24)
+            case .error(let message):
+                VStack(spacing: 10) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 28, weight: .light))
+                        .foregroundStyle(.secondary)
+                    Text(message)
+                        .font(.system(size: 13, weight: .regular, design: .rounded))
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                    Button("Try again") { Task { await load() } }
+                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.lucheInk)
+                }
+                .frame(maxWidth: .infinity, minHeight: 96)
+                .padding(.vertical, 24)
+                .transition(.opacity)
 
-        case .loaded(let observers):
-            if observers.isEmpty {
-                observersEmpty
-            } else {
-                VStack(spacing: 12) {
-                    ForEach(observers) { observer in
-                        observerRow(observer)
+            case .loaded(let observers):
+                if observers.isEmpty {
+                    observersEmpty
+                        .transition(.opacity)
+                } else {
+                    VStack(spacing: 12) {
+                        ForEach(observers) { observer in
+                            observerRow(observer)
+                        }
                     }
+                    .transition(.opacity)
                 }
             }
+        }
+        .animation(.easeOut(duration: 0.18), value: loadStateKey)
+    }
+
+    /// Stable key for animating between phases (the associated `[Observer]`
+    /// would otherwise change identity on every refresh and reset the fade).
+    private var loadStateKey: Int {
+        switch loadState {
+        case .loading: return 0
+        case .error:   return 1
+        case .loaded(let list): return 2 + list.count
         }
     }
 
