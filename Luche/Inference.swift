@@ -19,14 +19,14 @@ final class Inference: @unchecked Sendable {
     let evaluation: Evaluation
     private let model: MLModel
     private let outputName: String
-    private let inferenceQueue = DispatchQueue(label: "feraldemo.inference", qos: .userInitiated)
+    private let inferenceQueue = DispatchQueue(label: "luche.inference", qos: .userInitiated)
 
     init(for evaluation: Evaluation) throws {
         self.evaluation = evaluation
         let resource = evaluation.modelResourceName
         guard let url = Bundle.main.url(forResource: resource, withExtension: "mlmodelc")
             ?? Bundle.main.url(forResource: resource, withExtension: "mlpackage") else {
-            throw NSError(domain: "FeralDemo.Inference", code: 1,
+            throw NSError(domain: "Luche.Inference", code: 1,
                           userInfo: [NSLocalizedDescriptionKey: "\(resource).mlpackage missing from app bundle"])
         }
         let isPrecompiled = url.pathExtension == "mlmodelc"
@@ -71,7 +71,7 @@ final class Inference: @unchecked Sendable {
                     let predMs = Date().timeIntervalSince(predStart) * 1000
 
                     guard let array = prediction.featureValue(for: outputName)?.multiArrayValue else {
-                        throw NSError(domain: "FeralDemo.Inference", code: 2,
+                        throw NSError(domain: "Luche.Inference", code: 2,
                                       userInfo: [NSLocalizedDescriptionKey: "Output '\(outputName)' not found"])
                     }
                     let raw = Self.unpack(array)

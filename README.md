@@ -1,4 +1,4 @@
-# FeralDemo v2 — live streaming inference
+# Luche v2 — live streaming inference
 
 Landscape, fullscreen iPhone app. Records live video at 24 fps from the back
 camera, streams it through V-JEPA on-device, and visualizes per-frame scores
@@ -33,7 +33,7 @@ This is implemented in `FrameBuffer.swift` (~110 lines).
 v2/
 ├── README.md
 ├── project.yml                 ← xcodegen spec (landscape, fullscreen)
-└── FeralDemo/
+└── Luche/
     ├── App.swift               ← @main + AppState + AppPhase
     ├── RecordScreen.swift      ← idle / start
     ├── LiveRecordingScreen.swift ← camera + bar + stop
@@ -52,11 +52,10 @@ v2/
 ```bash
 cd /Users/ksc/feral_analysis/yc_demo/v2
 xcodegen
-open FeralDemo.xcodeproj
+open Luche.xcodeproj
 ```
 
-`PRODUCT_BUNDLE_IDENTIFIER` is `com.razza.feraldemov2` so v1 and v2 can both be
-installed on the same phone.
+`PRODUCT_BUNDLE_IDENTIFIER` is `com.ilovemaggie.svet`.
 
 ## Simulator vs device
 

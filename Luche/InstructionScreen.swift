@@ -42,7 +42,7 @@ struct InstructionScreen: View {
             VStack(alignment: .leading, spacing: 14) {
                 Text(evaluation.instructionTitle)
                     .font(.system(size: 32, weight: .bold, design: .rounded))
-                    .foregroundStyle(.black)
+                    .foregroundStyle(.lucheInk)
                     .fixedSize(horizontal: false, vertical: true)
 
                 VStack(alignment: .leading, spacing: 10) {
@@ -50,11 +50,11 @@ struct InstructionScreen: View {
                         HStack(alignment: .top, spacing: 12) {
                             Text("•")
                                 .font(.system(size: 20, weight: .bold, design: .rounded))
-                                .foregroundStyle(.black.opacity(0.7))
+                                .foregroundStyle(.lucheInk.opacity(0.7))
                                 .frame(width: 12, alignment: .leading)
                             Text(step)
                                 .font(.system(size: 19, weight: .regular, design: .rounded))
-                                .foregroundStyle(.black.opacity(0.8))
+                                .foregroundStyle(.lucheInk.opacity(0.8))
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
@@ -68,7 +68,7 @@ struct InstructionScreen: View {
                         .foregroundStyle(.white)
                         .frame(maxWidth: 300)
                         .frame(height: 52)
-                        .background(Color.black)
+                        .background(Color.lucheInk)
                         .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
@@ -106,7 +106,7 @@ struct InstructionScreen: View {
         } else {
             Image(systemName: evaluation.symbolName)
                 .font(.system(size: 140, weight: .light))
-                .foregroundStyle(.black)
+                .foregroundStyle(.lucheInk)
                 .frame(maxWidth: .infinity, maxHeight: 260)
         }
     }
@@ -117,13 +117,13 @@ struct InstructionScreen: View {
         VStack(spacing: 18) {
             Image(systemName: "rotate.right")
                 .font(.system(size: 56, weight: .light))
-                .foregroundStyle(.black.opacity(0.75))
+                .foregroundStyle(.lucheInk.opacity(0.75))
             Text("Rotate to landscape")
                 .font(.system(size: 22, weight: .semibold, design: .rounded))
-                .foregroundStyle(.black)
+                .foregroundStyle(.lucheInk)
             Text("Turn the phone sideways to read the test instructions.")
                 .font(.system(size: 15, weight: .regular, design: .rounded))
-                .foregroundStyle(.black.opacity(0.6))
+                .foregroundStyle(.lucheInk.opacity(0.6))
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
         }
@@ -135,9 +135,9 @@ struct InstructionScreen: View {
         } label: {
             Image(systemName: "chevron.left")
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(.black)
+                .foregroundStyle(.lucheInk)
                 .frame(width: 38, height: 38)
-                .background(Color.black.opacity(0.06))
+                .background(Color.lucheInk.opacity(0.06))
                 .clipShape(Circle())
         }
         .buttonStyle(.plain)

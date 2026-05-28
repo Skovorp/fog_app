@@ -29,7 +29,7 @@ struct ResultsScreen: View {
 
                 Text("Demo score · research preview")
                     .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(.black.opacity(0.4))
+                    .foregroundStyle(.lucheInk.opacity(0.4))
                     .textCase(.uppercase)
                     .tracking(1.0)
                     .padding(.top, 8)
@@ -61,10 +61,10 @@ struct ResultsScreen: View {
         VStack(spacing: 4) {
             Text(evaluation.displayName)
                 .font(.system(size: 26, weight: .bold, design: .rounded))
-                .foregroundStyle(.black)
+                .foregroundStyle(.lucheInk)
             Text(evaluation.updrsItem)
                 .font(.system(size: 12, weight: .medium, design: .rounded))
-                .foregroundStyle(.black.opacity(0.45))
+                .foregroundStyle(.lucheInk.opacity(0.45))
                 .textCase(.uppercase)
                 .tracking(1.2)
         }
@@ -76,20 +76,20 @@ struct ResultsScreen: View {
             VStack(spacing: 6) {
                 Text(String(format: "%.1f%%", session.fogPct))
                     .font(.system(size: 72, weight: .bold, design: .rounded))
-                    .foregroundStyle(.black)
+                    .foregroundStyle(.lucheInk)
                 Text("of frames classified as freezing")
                     .font(.system(size: 14, weight: .regular, design: .rounded))
-                    .foregroundStyle(.black.opacity(0.6))
+                    .foregroundStyle(.lucheInk.opacity(0.6))
                     .multilineTextAlignment(.center)
             }
         } else {
             VStack(spacing: 6) {
                 Text(String(format: "%.2f", session.updrsScore))
                     .font(.system(size: 72, weight: .bold, design: .rounded))
-                    .foregroundStyle(.black)
+                    .foregroundStyle(.lucheInk)
                 Text(session.updrsBand)
                     .font(.system(size: 18, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.black.opacity(0.7))
+                    .foregroundStyle(.lucheInk.opacity(0.7))
             }
         }
     }
@@ -108,7 +108,7 @@ struct ResultsScreen: View {
         }
         .padding(.vertical, 14)
         .frame(maxWidth: .infinity)
-        .background(Color.black.opacity(0.04))
+        .background(Color.lucheInk.opacity(0.04))
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
@@ -116,10 +116,10 @@ struct ResultsScreen: View {
         VStack(spacing: 3) {
             Text(value)
                 .font(.system(size: 18, weight: .semibold, design: .rounded))
-                .foregroundStyle(.black)
+                .foregroundStyle(.lucheInk)
             Text(label)
                 .font(.system(size: 11, weight: .medium, design: .rounded))
-                .foregroundStyle(.black.opacity(0.5))
+                .foregroundStyle(.lucheInk.opacity(0.5))
                 .textCase(.uppercase)
                 .tracking(0.8)
         }
@@ -128,7 +128,7 @@ struct ResultsScreen: View {
 
     private var divider: some View {
         Rectangle()
-            .fill(Color.black.opacity(0.08))
+            .fill(Color.lucheInk.opacity(0.08))
             .frame(width: 1, height: 32)
     }
 
@@ -153,7 +153,7 @@ struct ResultsScreen: View {
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
                 .frame(height: 58)
-                .background(Color.black)
+                .background(Color.lucheInk)
                 .clipShape(Capsule())
             }
             .buttonStyle(.plain)
@@ -164,10 +164,10 @@ struct ResultsScreen: View {
             } label: {
                 Text("Done")
                     .font(.system(size: 16, weight: .medium, design: .rounded))
-                    .foregroundStyle(.black)
+                    .foregroundStyle(.lucheInk)
                     .frame(maxWidth: .infinity)
                     .frame(height: 50)
-                    .background(Color.black.opacity(0.06))
+                    .background(Color.lucheInk.opacity(0.06))
                     .clipShape(Capsule())
             }
             .buttonStyle(.plain)

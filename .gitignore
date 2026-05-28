@@ -19,11 +19,12 @@ build/
 # Re-export with:
 #   cd ../../feral && python -m feral.export_coreml \
 #     --checkpoint <your.pt> --input-size 256 --num-frames 16 \
-#     --output ../yc_demo/v2/FeralDemo/<Name>Model.mlpackage
-FeralDemo/FeralModel.mlpackage/
-FeralDemo/ChairModel.mlpackage/
-FeralDemo/TappingModel.mlpackage/
-FeralDemo/WalkingModel.mlpackage/
+#     --output ../yc_demo/v2/Luche/<Name>Model.mlpackage
+Luche/FeralModel.mlpackage/
+Luche/ChairModel.mlpackage/
+Luche/TappingModel.mlpackage/
+Luche/WalkingModel.mlpackage/
+Luche/FreezingModel.mlpackage/
 *.mlpackage.zip
 
 # Local backup files / dirs

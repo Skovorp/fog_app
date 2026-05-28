@@ -1,4 +1,4 @@
-"""Generate 3 App Store screenshots for `feral`.
+"""Generate 3 App Store screenshots for `Luche`.
 
 Output: /Users/ksc/feral_analysis/yc_demo/v2/appstore/screen_{1,2,3}.png
 Size:   1290 × 2796 (iPhone 6.7" Pro Max portrait — standard App Store size)
@@ -93,7 +93,7 @@ def make_screen_1():
 
     # Footer
     note_f = font(38, 400)
-    draw_text(d, (W // 2, H - 90), "feral · made for clinicians and researchers", note_f, TERTIARY, anchor="mb")
+    draw_text(d, (W // 2, H - 90), "Luche · made for clinicians and researchers", note_f, TERTIARY, anchor="mb")
 
     out = OUT / "screen_1.png"
     im.save(out)

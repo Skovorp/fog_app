@@ -29,7 +29,7 @@ enum SessionPDF {
         let format = UIGraphicsPDFRendererFormat()
         format.documentInfo = [
             kCGPDFContextTitle as String: session.displayTitle,
-            kCGPDFContextCreator as String: "feral: parkinson's",
+            kCGPDFContextCreator as String: "Luche",
         ]
         return format
     }
@@ -43,7 +43,7 @@ enum SessionPDF {
         // Title — evaluation name
         evaluation.displayName.draw(at: CGPoint(x: margin, y: y), withAttributes: [
             .font: UIFont.systemFont(ofSize: 34, weight: .bold),
-            .foregroundColor: UIColor.black,
+            .foregroundColor: UIColor.lucheInk,
         ])
         y += 46
 
@@ -107,7 +107,7 @@ enum SessionPDF {
         drawGraph(scores: session.scores, in: graphRect, showFogThreshold: isFog)
 
         // Footer
-        let footer = "feral: parkinson's"
+        let footer = "Luche"
         let footerAttrs: [NSAttributedString.Key: Any] = [
             .font: UIFont.systemFont(ofSize: 10, weight: .regular),
             .foregroundColor: UIColor.lightGray,
@@ -131,7 +131,7 @@ enum SessionPDF {
         ]
         let valueAttrs: [NSAttributedString.Key: Any] = [
             .font: UIFont.systemFont(ofSize: 24, weight: .semibold),
-            .foregroundColor: UIColor.black,
+            .foregroundColor: UIColor.lucheInk,
         ]
         let labelHeight: CGFloat = 16
         let valueHeight: CGFloat = 30
@@ -154,7 +154,7 @@ enum SessionPDF {
         ]
 
         // Plot frame
-        ctx.setStrokeColor(UIColor.black.cgColor)
+        ctx.setStrokeColor(UIColor.lucheInk.cgColor)
         ctx.setLineWidth(0.5)
         ctx.stroke(rect)
 
@@ -215,7 +215,7 @@ enum SessionPDF {
         }
 
         // Score line
-        ctx.setStrokeColor(UIColor.black.cgColor)
+        ctx.setStrokeColor(UIColor.lucheInk.cgColor)
         ctx.setLineWidth(0.9)
         ctx.beginPath()
         let denom = CGFloat(max(n - 1, 1))

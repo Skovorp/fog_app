@@ -41,10 +41,10 @@ struct LiveRecordingScreen: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Color.lucheInk.ignoresSafeArea()
 
             #if targetEnvironment(simulator)
-            LinearGradient(colors: [.indigo, .black], startPoint: .top, endPoint: .bottom)
+            LinearGradient(colors: [.indigo, .lucheInk], startPoint: .top, endPoint: .bottom)
                 .ignoresSafeArea()
                 .overlay(
                     Text("Simulator — synthetic frames")
@@ -115,7 +115,7 @@ struct LiveRecordingScreen: View {
                 .foregroundStyle(.white.opacity(0.55))
         }
         .padding(28)
-        .background(Color.black.opacity(0.55))
+        .background(Color.lucheInk.opacity(0.55))
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
@@ -133,7 +133,7 @@ struct LiveRecordingScreen: View {
                     .font(.system(size: 26, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
             }
-            .shadow(color: .black.opacity(0.35), radius: 16, x: 0, y: 6)
+            .shadow(color: .lucheInk.opacity(0.35), radius: 16, x: 0, y: 6)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Start recording")
@@ -175,7 +175,7 @@ struct LiveRecordingScreen: View {
             .foregroundStyle(.white)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
-            .background(Color.black.opacity(0.55))
+            .background(Color.lucheInk.opacity(0.55))
             .clipShape(Capsule())
     }
 

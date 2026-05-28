@@ -1,9 +1,9 @@
-feral — Privacy Policy
+Luche — Privacy Policy
 
 Effective date: May 4, 2026
 Contact: jacopo.razza@gmail.com
 
-This is the privacy policy for "feral" (the "App"), an iOS application that
+This is the privacy policy for "Luche" (the "App"), an iOS application that
 scores freezing of gait from a turn-in-place test. We take a "no surprises"
 approach: nothing leaves your device unless you explicitly choose to share
 it.

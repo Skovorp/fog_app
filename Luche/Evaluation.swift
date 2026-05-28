@@ -92,7 +92,7 @@ enum Evaluation: String, Codable, CaseIterable, Identifiable, Hashable {
     /// Name of the .mlpackage in the app bundle (sans extension).
     var modelResourceName: String {
         switch self {
-        case .freezingOfGait:   return "FeralModel"
+        case .freezingOfGait:   return "FreezingModel"
         case .gait:             return "WalkingModel"
         case .arisingFromChair: return "ChairModel"
         case .fingerTapping:    return "TappingModel"

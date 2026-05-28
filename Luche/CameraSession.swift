@@ -25,7 +25,7 @@ final class CameraSession: NSObject {
     let targetFPS: Int = 24
 
     let session = AVCaptureSession()
-    private let videoQueue = DispatchQueue(label: "feraldemo.camera.video", qos: .userInitiated)
+    private let videoQueue = DispatchQueue(label: "luche.camera.video", qos: .userInitiated)
     private var output: AVCaptureVideoDataOutput?
     private var device: AVCaptureDevice?
     private var onFrame: ((CVPixelBuffer) -> Void)?
@@ -129,13 +129,13 @@ final class CameraSession: NSObject {
         guard let device = candidates.lazy
             .compactMap({ AVCaptureDevice.default($0, for: .video, position: .back) })
             .first else {
-            throw NSError(domain: "FeralDemo.CameraSession", code: 1, userInfo: [NSLocalizedDescriptionKey: "No back camera"])
+            throw NSError(domain: "Luche.CameraSession", code: 1, userInfo: [NSLocalizedDescriptionKey: "No back camera"])
         }
         self.device = device
 
         let input = try AVCaptureDeviceInput(device: device)
         guard session.canAddInput(input) else {
-            throw NSError(domain: "FeralDemo.CameraSession", code: 2, userInfo: [NSLocalizedDescriptionKey: "Cannot add camera input"])
+            throw NSError(domain: "Luche.CameraSession", code: 2, userInfo: [NSLocalizedDescriptionKey: "Cannot add camera input"])
         }
         session.addInput(input)
 
@@ -155,7 +155,7 @@ final class CameraSession: NSObject {
         output.alwaysDiscardsLateVideoFrames = true
         output.setSampleBufferDelegate(self, queue: videoQueue)
         guard session.canAddOutput(output) else {
-            throw NSError(domain: "FeralDemo.CameraSession", code: 3, userInfo: [NSLocalizedDescriptionKey: "Cannot add video output"])
+            throw NSError(domain: "Luche.CameraSession", code: 3, userInfo: [NSLocalizedDescriptionKey: "Cannot add video output"])
         }
         session.addOutput(output)
 

@@ -73,7 +73,7 @@ enum Preprocess {
             bytesPerRow: bytesPerRow, space: cs,
             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue
         ) else {
-            throw NSError(domain: "FeralDemo.Preprocess", code: 1, userInfo: [NSLocalizedDescriptionKey: "Could not create RGBA context"])
+            throw NSError(domain: "Luche.Preprocess", code: 1, userInfo: [NSLocalizedDescriptionKey: "Could not create RGBA context"])
         }
         ctx.draw(image, in: CGRect(x: 0, y: 0, width: size, height: size))
 

@@ -1,4 +1,4 @@
-# feral — Beta App Information for App Store Connect
+# Luche — Beta App Information for App Store Connect
 
 Fields below map 1-to-1 to App Store Connect → TestFlight → "Test Information"
 and the App Information sections you need filled before external testing
@@ -10,9 +10,9 @@ opens. Copy/paste the values straight in.
 
 | Field | Value |
 |---|---|
-| **App name** | feral |
+| **App name** | Luche |
 | **Subtitle** | Score freezing of gait |
-| **Bundle ID** | `com.razza.feraldemov2ojnvdfijvn` |
+| **Bundle ID** | `com.ilovemaggie.svet` |
 | **Primary category** | Medical |
 | **Secondary category** | Health & Fitness |
 | **Primary language** | English (U.S.) |
@@ -26,7 +26,7 @@ opens. Copy/paste the values straight in.
 ## TestFlight → Test Information
 
 ### Beta App Description
-> feral scores freezing of gait, a Parkinson's symptom, from a turn-in-place
+> Luche scores freezing of gait, a Parkinson's symptom, from a turn-in-place
 > test. Point the iPhone camera at the person walking, hit Start, and the
 > bottom bar shows per-frame freezing probability live — no internet, no
 > upload, all inference on the Neural Engine. Stop to save the session;
@@ -69,9 +69,9 @@ build of a new app needs human review, ~24 h).
 
 | Question | Answer |
 |---|---|
-| **Sign-in required?** | No |
-| **Demo account credentials** | n/a |
-| **Notes for reviewer** | The app uses the rear camera to record short clips of a person performing a turn-in-place gait test. All inference runs on-device via Core ML — no network calls, no accounts, no third-party services. Open the app, tap **Start** in landscape orientation, and within ~1 second the bottom bar should fill with a colored gradient indicating the model's per-frame freezing probability. Tap **Stop** to save the session. |
+| **Sign-in required?** | Yes |
+| **Demo account credentials** | _email:_ `<FILL IN>` · _password:_ `<FILL IN>` |
+| **Notes for reviewer** | Sign in with the demo account above (account sign-in is handled by Clerk). After signing in, the app uses the rear camera to record short clips of a person performing a turn-in-place gait test; video inference runs on-device via Core ML and recorded frames are never uploaded. Open the app, tap **Start** in landscape orientation, and within ~1 second the bottom bar should fill with a colored gradient indicating the model's per-frame freezing probability. Tap **Stop** to save the session. |
 | **Contact email** | jacopo.razza@gmail.com |
 
 ---
@@ -120,10 +120,10 @@ in order, with the exact value to pick.
 | Field | Pick |
 |---|---|
 | Platforms | iOS (only) |
-| Name | feral |
+| Name | Luche |
 | Primary language | English (U.S.) |
-| Bundle ID | `com.razza.feraldemov2ojnvdfijvn` |
-| SKU | `feral-ios-001` (any unique string, never shown to users) |
+| Bundle ID | `com.ilovemaggie.svet` |
+| SKU | `luche-ios-001` (any unique string, never shown to users) |
 | User Access | Full Access |
 
 ### App Information → General Information
@@ -170,8 +170,8 @@ Click **Get Started**.
 ### TestFlight → External Testing → Submit for Beta App Review
 | Field | Pick |
 |---|---|
-| Sign-in required? | No |
-| Demo account credentials | leave blank |
+| Sign-in required? | Yes |
+| Demo account credentials | enter the demo email + password (see Beta App Review answers above) |
 | What's New in This Build | "Initial TestFlight build." |
 | Notes for Review | (paste the "Notes for reviewer" line from above) |
 | Contact info — First/Last/Email/Phone | your real details |
@@ -225,7 +225,7 @@ system encryption" as equivalent to "no non-exempt encryption" for this flag.*
 > Score freezing of gait — a Parkinson's symptom — from a turn-in-place test. Real-time on iPhone, fully on-device, no internet required.
 
 ### Description
-> feral scores freezing of gait (FOG) from short videos of a person performing a turn-in-place test. Aimed at clinicians and researchers tracking the motor symptoms of Parkinson's disease.
+> Luche scores freezing of gait (FOG) from short videos of a person performing a turn-in-place test. Aimed at clinicians and researchers tracking the motor symptoms of Parkinson's disease.
 >
 > Open the app, tap Start, point the camera at the person walking. A colored bar at the bottom of the screen shows the model's per-frame freezing probability in real time. Tap Stop and the recording is saved as a session — replay the video, export a clean PDF report with a per-frame fog graph, or export every session at once as PDF, JSON, or a ZIP of videos.
 >

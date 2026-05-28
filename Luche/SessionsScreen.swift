@@ -7,6 +7,7 @@ struct SessionsScreen: View {
     @State private var pendingExport: ExportItem?
     @State private var exportError: String?
     @State private var exportingIDs: Set<UUID> = []
+    @State private var isExportingAll = false
     @State private var pendingDelete: Session?
     @State private var playingVideo: PlayingVideo?
     @AppStorage("skipDeleteConfirmation") private var skipDeleteConfirmation = false
@@ -53,6 +54,36 @@ struct SessionsScreen: View {
         .navigationTitle("Previous sessions")
         .navigationBarTitleDisplayMode(.large)
         .toolbar(.visible, for: .navigationBar)
+        .toolbar {
+            // Top-right "Export" menu — bundles all sessions into one file
+            // in the chosen format. The per-card export below still handles
+            // single-session PDFs.
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button { exportAll(.pdf) } label: {
+                        Label("Human-readable PDF", systemImage: "doc.richtext")
+                    }
+                    Button { exportAll(.json) } label: {
+                        Label("Machine-readable JSON", systemImage: "curlybraces")
+                    }
+                    Button { exportAll(.videos) } label: {
+                        Label("Videos (ZIP)", systemImage: "film")
+                    }
+                } label: {
+                    if isExportingAll {
+                        ProgressView()
+                            .progressViewStyle(.circular)
+                            .tint(.lucheInk)
+                            .controlSize(.small)
+                    } else {
+                        Label("Export", systemImage: "square.and.arrow.up")
+                            .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    }
+                }
+                .disabled(store.sessions.isEmpty || isExportingAll)
+                .accessibilityLabel("Export all sessions")
+            }
+        }
         .sheet(item: $pendingExport) { item in
             ShareSheet(items: [item.url])
         }
@@ -78,7 +109,11 @@ struct SessionsScreen: View {
                 pendingDelete = nil
             }
         } message: { session in
-            Text("\"\(session.displayTitle)\" — \(session.totalFrames) frames will be permanently removed.")
+            // §cloud-sync: local delete only removes the on-device copy.
+            // If this session was already synced, the cloud copy stays
+            // (per-trial cloud deletion isn't implemented yet) — don't
+            // promise "permanently removed" in that case.
+            Text(deleteMessage(for: session))
         }
     }
 
@@ -102,6 +137,19 @@ struct SessionsScreen: View {
         } else {
             pendingDelete = session
         }
+    }
+
+    /// Honest delete copy: tell the user whether the cloud copy stays. If they
+    /// already uploaded this session via Data sharing's cloud sync, deleting
+    /// locally does NOT remove it from the server — per-trial cloud delete
+    /// isn't shipped yet. Once it ships, this branch can collapse back to
+    /// "permanently removed".
+    private func deleteMessage(for session: Session) -> String {
+        let base = "\"\(session.displayTitle)\" — \(session.totalFrames) frames will be removed from this device."
+        if store.uploadedIDs.contains(session.id) {
+            return base + " The copy already uploaded to the cloud will stay there until cloud deletion is available."
+        }
+        return base
     }
 
     // MARK: First-visit hint
@@ -172,6 +220,44 @@ struct SessionsScreen: View {
             }
             await MainActor.run {
                 exportingIDs.remove(session.id)
+                switch result {
+                case .success(let url):
+                    pendingExport = ExportItem(url: url)
+                case .failure(let error):
+                    exportError = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    // MARK: Bulk export (top "Export" menu)
+
+    private enum ExportAllFormat { case pdf, json, videos }
+
+    /// Bundle every saved session into one file in the chosen format. JSON
+    /// needs a fallback `DeviceInfo` for sessions saved before per-session
+    /// device capture existed — grab it on MainActor (it's @MainActor) before
+    /// hopping to the detached worker.
+    private func exportAll(_ format: ExportAllFormat) {
+        guard !isExportingAll, !store.sessions.isEmpty else { return }
+        isExportingAll = true
+        let snapshot = store.sessions
+        let fallbackDevice = DeviceInfo.current()
+        Task.detached(priority: .userInitiated) {
+            let result: Result<URL, Error>
+            do {
+                let url: URL
+                switch format {
+                case .pdf:    url = try SessionExport.generateAllPDF(snapshot)
+                case .json:   url = try SessionExport.generateAllJSON(snapshot, fallbackDevice: fallbackDevice)
+                case .videos: url = try SessionExport.generateAllVideosZIP(snapshot)
+                }
+                result = .success(url)
+            } catch {
+                result = .failure(error)
+            }
+            await MainActor.run {
+                isExportingAll = false
                 switch result {
                 case .success(let url):
                     pendingExport = ExportItem(url: url)
@@ -255,7 +341,7 @@ private struct SessionCard: View {
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 11)
-                        .background(Color.black)
+                        .background(Color.lucheInk)
                         .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
@@ -335,7 +421,7 @@ private struct SessionVideoPlayer: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Color.lucheInk.ignoresSafeArea()
             VideoPlayer(player: player)
                 .ignoresSafeArea()
                 .onAppear { player.play() }
@@ -349,7 +435,7 @@ private struct SessionVideoPlayer: View {
                             .font(.system(size: 14, weight: .bold))
                             .foregroundStyle(.white)
                             .frame(width: 36, height: 36)
-                            .background(Color.black.opacity(0.55))
+                            .background(Color.lucheInk.opacity(0.55))
                             .clipShape(Circle())
                     }
                     .buttonStyle(.plain)

@@ -152,7 +152,7 @@ struct FrameBarView: View {
         return f
     }
     ZStack {
-        LinearGradient(colors: [.indigo, .purple, .black], startPoint: .top, endPoint: .bottom)
+        LinearGradient(colors: [.indigo, .purple, .lucheInk], startPoint: .top, endPoint: .bottom)
         VStack {
             Spacer()
             FrameBarView(frames: frames)
