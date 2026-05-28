@@ -71,6 +71,13 @@ struct LucheApp: App {
                 .environment(Clerk.shared)
                 .statusBarHidden(true)
                 .persistentSystemOverlays(.hidden)
+                // App-wide light mode. The Luche UI hard-codes a white /
+                // `lucheInk` palette and a few screens (SessionsScreen,
+                // results cards) lean on system semantic colours like
+                // `secondarySystemBackground` + `.primary` / `.secondary`
+                // text — pinning to `.light` keeps those reading correctly
+                // on phones in system Dark Mode.
+                .preferredColorScheme(.light)
         }
     }
 }
