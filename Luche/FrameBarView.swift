@@ -8,19 +8,33 @@ import SwiftUI
 ///   - **unprocessed** (no score yet): full-height grey, with a deterministic
 ///     per-frame brightness jitter so the bar's motion is visible.
 ///   - **processed**: a histogram-style fill rising from the bottom of the
-///     tile. Score 0 → 10% fill (green), score 1 → 100% fill (red). The unfilled
-///     top is fully transparent — the camera preview shows through.
+///     tile. The fill scales by `score / scoreRange.upperBound`, so the
+///     visual mapping (green at 0 → red at the top of the scale) is the
+///     same for FoG/chair (0–1) and walking/tapping (0–4).
 ///
 /// Tiles auto-size so that exactly `visibleSeconds * fps` of footage is on
 /// screen at any given moment.
 struct FrameBarView: View {
     let frames: [FrameBuffer.Frame]
+    /// Display range for the score axis. FoG / chair → 0…1; walking /
+    /// tapping → 0…4 (raw MDS-UPDRS). Drives normalization for color,
+    /// fill height, threshold cap, and the per-tile label format.
+    let scoreRange: ClosedRange<Float>
 
     private let visibleSeconds: Double = 10.0
     private let fps: Double = 24.0
     private let barHeight: CGFloat = 90
     private let minFillFraction: CGFloat = 0.10
     private let minTextWidth: CGFloat = 12
+
+    /// Normalized score in [0, 1] for color / fill arithmetic.
+    private func normalized(_ score: Float) -> CGFloat {
+        let lo = scoreRange.lowerBound
+        let hi = scoreRange.upperBound
+        let span = max(hi - lo, .leastNonzeroMagnitude)
+        let clipped = Swift.max(lo, Swift.min(hi, score))
+        return CGFloat((clipped - lo) / span)
+    }
 
     var body: some View {
         Canvas { context, size in
@@ -32,6 +46,8 @@ struct FrameBarView: View {
             let visibleCount = min(count, targetVisible)
             let startIdx = count - visibleCount
             let showText = squareWidth >= minTextWidth
+            // 0.5 of FoG's [0,1] range; same proportional cutoff for [0,4].
+            let halfMark = (scoreRange.lowerBound + scoreRange.upperBound) / 2
 
             for i in startIdx..<count {
                 let positionFromRight = CGFloat(count - 1 - i)
@@ -39,23 +55,22 @@ struct FrameBarView: View {
                 let frame = frames[i]
 
                 if let score = frame.score {
-                    let clipped = CGFloat(max(0, min(1, score)))
-                    let fillFraction = minFillFraction + clipped * (1 - minFillFraction)
+                    let norm = normalized(score)
+                    let fillFraction = minFillFraction + norm * (1 - minFillFraction)
                     let fillHeight = size.height * fillFraction
                     let rect = CGRect(x: x, y: size.height - fillHeight, width: squareWidth, height: fillHeight)
                     context.fill(Path(rect), with: .color(scoreColor(score)))
 
-                    // Red cap on tiles that cross the 0.5 threshold — makes "above
-                    // 50%" segments instantly readable as a contiguous red bar.
-                    if score > 0.5 {
+                    // Red cap on tiles past the halfway mark of the score
+                    // range — instant visual cue for "above 50% of scale".
+                    if score > halfMark {
                         let capHeight: CGFloat = 3
                         let capRect = CGRect(x: x, y: size.height - fillHeight, width: squareWidth, height: capHeight)
                         context.fill(Path(capRect), with: .color(.red))
                     }
 
                     if showText {
-                        let percent = Int((score * 100).rounded())
-                        let text = Text("\(percent)")
+                        let text = Text(tileLabel(for: score))
                             .font(.system(size: 8, weight: .semibold, design: .monospaced))
                             .foregroundColor(.white)
                         let resolved = context.resolve(text)
@@ -80,19 +95,21 @@ struct FrameBarView: View {
         .allowsHitTesting(false)
     }
 
-    /// Horizontal reference lines at 0/25/50/75/100% scores, with right-edge
-    /// labels. Drawn last so they sit on top of tiles.
+    /// Horizontal reference lines at 0/25/50/75/100% of the score range,
+    /// with right-edge labels — percentage for FoG/chair (0–1 range),
+    /// actual score for walking/tapping (0–4 range).
     private func drawGuides(context: GraphicsContext, size: CGSize) {
-        let stops: [Int] = [0, 25, 50, 75, 100]
+        let stops: [CGFloat] = [0, 0.25, 0.5, 0.75, 1.0]
         let labelWidth: CGFloat = 26
         let lineColor = Color.white.opacity(0.35)
+        let upper = scoreRange.upperBound
+        let useRawScale = upper > 1.0
 
-        for p in stops {
-            let score = CGFloat(p) / 100
-            let fillFraction = minFillFraction + score * (1 - minFillFraction)
+        for fraction in stops {
+            let fillFraction = minFillFraction + fraction * (1 - minFillFraction)
             let y = size.height - size.height * fillFraction
 
-            let isExtreme = p == 0 || p == 100
+            let isExtreme = fraction == 0 || fraction == 1
             var path = Path()
             path.move(to: CGPoint(x: 0, y: y))
             path.addLine(to: CGPoint(x: size.width - labelWidth, y: y))
@@ -105,7 +122,14 @@ struct FrameBarView: View {
                 )
             )
 
-            let text = Text("\(p)")
+            let label: String
+            if useRawScale {
+                let value = scoreRange.lowerBound + Float(fraction) * (upper - scoreRange.lowerBound)
+                label = String(format: "%.0f", value)
+            } else {
+                label = "\(Int((fraction * 100).rounded()))"
+            }
+            let text = Text(label)
                 .font(.system(size: 9, weight: .semibold, design: .monospaced))
                 .foregroundColor(.white.opacity(0.9))
             let resolved = context.resolve(text)
@@ -122,10 +146,20 @@ struct FrameBarView: View {
         }
     }
 
-    /// Red close to 1, green close to 0.
+    /// Per-tile label format. For a [0,1] range we show the integer percent
+    /// (matches the original FoG bar); for a [0,4] range we show one
+    /// decimal of the raw 0–4 score.
+    private func tileLabel(for score: Float) -> String {
+        if scoreRange.upperBound > 1 {
+            return String(format: "%.1f", score)
+        }
+        return "\(Int((score * 100).rounded()))"
+    }
+
+    /// Red close to the top of the score range, green close to the bottom.
     private func scoreColor(_ score: Float) -> Color {
-        let clipped = Double(max(0, min(1, score)))
-        let hue = (1.0 - clipped) * 0.33
+        let norm = Double(normalized(score))
+        let hue = (1.0 - norm) * 0.33
         return Color(hue: hue, saturation: 0.85, brightness: 0.95)
     }
 
@@ -155,7 +189,7 @@ struct FrameBarView: View {
         LinearGradient(colors: [.indigo, .purple, .lucheInk], startPoint: .top, endPoint: .bottom)
         VStack {
             Spacer()
-            FrameBarView(frames: frames)
+            FrameBarView(frames: frames, scoreRange: 0...1)
         }
     }
 }

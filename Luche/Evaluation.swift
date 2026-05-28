@@ -104,36 +104,22 @@ enum Evaluation: String, Codable, CaseIterable, Identifiable, Hashable {
     /// stay uniform.
     var captureFramesPerChunk: Int { 64 }
 
-    /// Number of frames actually fed to the model after subsampling. FoG
-    /// subsamples to 16; walking / chair / tapping all subsample to 32.
-    /// Walking model was re-exported with PE interpolation at 32 frames to
-    /// match the latency of the other regression heads.
-    var modelInputFrames: Int {
-        switch self {
-        case .freezingOfGait: return 16   // 64 captured frames, every 4th
-        case .gait, .arisingFromChair, .fingerTapping: return 32   // every other
-        }
-    }
+    /// Number of frames fed to the model per chunk. 64 every-frame across
+    /// all heads — matches the recipe each checkpoint was trained on
+    /// (`chunk_length: 64, chunk_step: 1`). Prior exports subsampled to
+    /// 16/32 frames for latency; that's been moved off the model and onto
+    /// the live scheduler (skip-to-latest + end-of-session drain) instead.
+    var modelInputFrames: Int { 64 }
 
-    /// Stride from the capture buffer when building the model input.
-    /// `modelInputFrames * frameSubsampleStep == captureFramesPerChunk`.
-    var frameSubsampleStep: Int {
-        switch self {
-        case .freezingOfGait: return 4
-        case .gait, .arisingFromChair, .fingerTapping: return 2
-        }
-    }
+    /// Stride from the capture buffer when building the model input. Always
+    /// 1 — `modelInputFrames * frameSubsampleStep == captureFramesPerChunk`.
+    var frameSubsampleStep: Int { 1 }
 
-    /// How many capture frames the buffer advances between chunks. FoG uses
-    /// 50% overlap (32) so per-frame probabilities are averaged across two
-    /// chunks. Regression heads emit one number per chunk that gets stamped
-    /// to all 64 frames in the window — overlap would just duplicate work.
-    var captureChunkShift: Int {
-        switch self {
-        case .freezingOfGait: return 32   // 50% overlap
-        default:              return 64   // no overlap
-        }
-    }
+    /// How many capture frames the buffer advances between chunks. Always
+    /// 64 (non-overlapping) so each capture frame belongs to exactly one
+    /// chunk — live skip-to-latest stashes the unscored chunks and the
+    /// post-session drain fills them in with no double-counting.
+    var captureChunkShift: Int { 64 }
 
     /// True if the model returns one probability per capture frame
     /// (`captureFramesPerChunk` outputs). False if it returns a single
@@ -145,11 +131,20 @@ enum Evaluation: String, Codable, CaseIterable, Identifiable, Hashable {
         }
     }
 
-    /// True if the FrameBuffer should drop queued chunks and always jump to
-    /// the most recent fully-captured chunk when the model can't keep up.
-    /// Leaves visible holes in the score timeline where chunks were skipped.
-    /// No evaluation uses this today; kept as a hook for future slow heads.
-    var skipQueuedChunks: Bool { false }
+    /// Per-evaluation display / clamp range for a single frame score.
+    ///   - FoG: per-frame fog probability in [0, 1].
+    ///   - Chair: 0–1. Training labels for `exp_chair_strong_with_negs` are
+    ///     50% raw=0 and 50% raw=1, never 2–4, so clamping above 1 is noise.
+    ///   - Walking / Tapping: raw MDS-UPDRS 0–4 scale. Training labels span
+    ///     0–3 with mean ≈ 1.1; we expose the full 0–4 schema so the bar
+    ///     can show severe-end outliers if they appear.
+    /// See `wiki/ios-app/symptoms/<head>` for train-label histograms.
+    var scoreRange: ClosedRange<Float> {
+        switch self {
+        case .freezingOfGait, .arisingFromChair: return 0.0...1.0
+        case .gait, .fingerTapping:              return 0.0...4.0
+        }
+    }
 
     /// Spatial input size H=W in pixels — matches what the matching mlpackage
     /// was exported at. All current models are 256².

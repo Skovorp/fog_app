@@ -5,16 +5,20 @@ import Foundation
 /// Wraps one of the FERAL Core ML packages. Two output shapes are handled:
 ///
 ///   - **Per-frame (FoG)** — output `scores`, shape (1, 64). One probability
-///     per captured frame in [0, 1]. Returned as-is.
+///     per captured frame in [0, 1]. Clamped (filters NaN/overflow) and
+///     returned as-is.
 ///   - **Chunk-level regression (walking / chair / tapping)** — output
-///     `updrs_score`, shape (1,). A single denormalized UPDRS score in [0, 4]
-///     for the whole chunk. We map it back to a per-frame [0, 1] score by
-///     dividing by 4, clamping, and stamping the result to all 64 capture
-///     frames in the chunk so the score bar and saved Session stay homogeneous.
+///     `updrs_score`, shape (1,). A single denormalized scalar (the head's
+///     `mean + std * z`) for the whole chunk. Clamped to the evaluation's
+///     `scoreRange` (chair → [0, 1] because train labels are 50/50 at 0 and
+///     1; walking / tapping → [0, 4] raw MDS-UPDRS) and stamped to all 64
+///     capture frames in the chunk so the score bar and saved Session stay
+///     homogeneous.
 ///
 /// Both contracts produce a `[Float]` of length `evaluation.captureFramesPerChunk`
-/// to the caller so the rest of the pipeline (FrameBuffer, FrameBarView,
-/// Session) doesn't need to know which kind of model was run.
+/// to the caller. The per-frame score range is reported by
+/// `evaluation.scoreRange`; the rest of the pipeline (FrameBuffer,
+/// FrameBarView, Session) normalizes by `upperBound` for display.
 final class Inference: @unchecked Sendable {
     let evaluation: Evaluation
     private let model: MLModel
@@ -50,8 +54,8 @@ final class Inference: @unchecked Sendable {
     }
 
     /// Run inference on `captureFramesPerChunk` raw camera frames. Returns one
-    /// score in [0, 1] per capture frame regardless of which underlying model
-    /// is loaded.
+    /// score in `evaluation.scoreRange` per capture frame, regardless of
+    /// which underlying model is loaded.
     func run(buffers: [CVPixelBuffer]) async throws -> [Float] {
         precondition(buffers.count == evaluation.captureFramesPerChunk,
                      "Expected \(evaluation.captureFramesPerChunk) frames, got \(buffers.count)")
@@ -90,18 +94,24 @@ final class Inference: @unchecked Sendable {
         }
     }
 
-    /// FoG returns one [0,1] probability per capture frame — keep as-is.
-    /// Regression returns a "severity" scalar — clamp to [0, 1] and stamp it
-    /// to every capture frame in the chunk. The regression heads are loosely
-    /// MDS-UPDRS-adjacent but were trained on small/narrow datasets, so we
-    /// don't claim the output is on the official 0-4 UPDRS scale. Treat the
-    /// number as a 0-1 trouble-with-task probability instead.
+    /// Clamp the raw model output into the evaluation's display range, then
+    /// shape it into one score per capture frame:
+    ///
+    ///   - **FoG**: model emits 64 per-frame probabilities; clamp each one
+    ///     into [0, 1] to filter NaN / overflow noise and return as-is.
+    ///   - **Regression heads**: model emits one denormalized scalar. Clamp
+    ///     into `evaluation.scoreRange` (chair → [0, 1]; walking / tapping →
+    ///     [0, 4] raw MDS-UPDRS) and stamp it to all 64 capture frames so
+    ///     the FrameBuffer / FrameBarView / Session can stay range-agnostic.
     private static func normalizeForCaptureFrames(_ raw: [Float], evaluation: Evaluation) -> [Float] {
+        let lo = evaluation.scoreRange.lowerBound
+        let hi = evaluation.scoreRange.upperBound
+        let clamp: (Float) -> Float = { Swift.max(lo, Swift.min(hi, $0)) }
         if evaluation.outputIsPerFrame {
-            return raw
+            return raw.map(clamp)
         }
         let scalar = raw.first ?? .nan
-        let clamped = Swift.max(0, Swift.min(1, scalar))
+        let clamped = clamp(scalar)
         return Array(repeating: clamped, count: evaluation.captureFramesPerChunk)
     }
 

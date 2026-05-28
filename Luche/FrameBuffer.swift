@@ -4,18 +4,24 @@ import Observation
 
 /// Holds the rolling list of captured frames and schedules inference chunks.
 ///
-/// Chunk strategy is per-evaluation, configured from `Inference.evaluation`:
-///   - **FoG**: 64-frame chunks with a 32-frame shift (50% overlap). Each
-///     middle frame ends up with two predictions; we average. First 32 and
-///     trailing in-flight frames are scored only once.
-///   - **Walking / Chair / Tapping**: 64-frame chunks with a 64-frame shift
-///     (no overlap). The model returns a single chunk-level scalar which
-///     `Inference` stamps to every capture frame in the window — so each
-///     frame here ends up with scoreCount=1.
+/// **Chunk strategy (identical for every evaluation):**
+///   - 64-frame chunks aligned to capture-index 0 (chunk *k* = `[64k, 64k+64)`).
+///   - **Non-overlapping** — `captureChunkShift == 64`. Every captured frame
+///     belongs to exactly one chunk and ends up with `scoreCount == 1` after
+///     either the live scheduler scores it or the post-session drain fills
+///     it in.
+///   - **Skip-to-latest + stash.** Single in-flight inference. When the
+///     worker frees up:
+///       - If ≥2 full chunks are ready, score the *latest* one live and
+///         push every older ready chunk onto `stash`.
+///       - Stashed chunks' `CVPixelBuffer`s are dropped immediately — the
+///         session's `.mp4` (written by `CameraSession.videoWriter` in real
+///         time) is the source of truth for re-decoding them in the
+///         post-session `PostProcessor` drain.
 ///
-/// To keep memory bounded, each frame's CVPixelBuffer is dropped once both
-/// (a) it sits below the next pending chunk's start, and (b) it's older than
-/// the latest 128 captured frames.
+/// Memory in steady state: only the in-flight chunk's 64 pixel buffers stay
+/// in RAM. `frames` itself grows linearly with capture but each `Frame` is
+/// tiny once its pixelBuffer is nilled (just the int index + score sum/count).
 @MainActor
 @Observable
 final class FrameBuffer {
@@ -31,28 +37,35 @@ final class FrameBuffer {
         }
     }
 
-    /// Capture-side chunk size. Always 64 — matches the rolling 2.67 s window
-    /// the camera buffers across all evaluations.
+    /// Capture-side chunk size. 64 across all evaluations.
     static let chunkSize: Int = 64
-    /// Default shift, used by simulator-only synthetic streams and as the
-    /// chunkShift when no Inference is attached (loading-spinner case).
-    static let chunkShift: Int = 32
-
-    /// Per-instance chunk shift — driven by the evaluation. 32 for FoG (50%
-    /// overlap), 64 for the regression heads (no overlap).
-    let chunkShift: Int
 
     private(set) var frames: [Frame] = []
     private(set) var inferenceInflight: Bool = false
+    /// Chunk-start indices the live scheduler deferred to the post-session
+    /// drain. Stays empty while inference keeps up with capture; grows by
+    /// one entry every time `kickInferenceIfReady` sees ≥2 ready chunks.
+    private(set) var stash: [Int] = []
+
+    /// Smallest chunk-start the scheduler hasn't decided on yet (neither
+    /// scored, nor stashed, nor in-flight). Increments by `chunkSize` each
+    /// time the scheduler picks (or skips) a chunk.
     private var nextChunkStart: Int = 0
+    /// Chunk-start currently in flight, or -1 when idle.
     private var inflightStart: Int = -1
+    /// Lowest frame index that still has a live pixel buffer. Tracked so
+    /// `dropOldBuffers` is O(delta) per call instead of O(N).
+    private var oldestLivePixelBuffer: Int = 0
+    /// Handle on the in-flight inference Task so `awaitInflight()` can wait
+    /// for it before the post-session drainer starts (otherwise the live
+    /// continuation could double-write the in-flight chunk).
+    private var inflightTask: Task<Void, Never>?
 
     private let inference: Inference?
     private let onError: (Error) -> Void
 
     init(inference: Inference?, onError: @escaping (Error) -> Void) {
         self.inference = inference
-        self.chunkShift = inference?.evaluation.captureChunkShift ?? Self.chunkShift
         self.onError = onError
     }
 
@@ -73,58 +86,120 @@ final class FrameBuffer {
     }
 
     /// Simulator hook — applies a chunk of synthetic scores through the same
-    /// running-average path the real inference path uses.
+    /// running-average path the real inference uses.
     func applySyntheticChunk(_ scores: [Float], start: Int) {
         applyChunkScores(scores, start: start)
     }
 
+    /// `PostProcessor` hook — stamp drained-chunk scores back into the per-
+    /// frame array. Same code path as live, just labelled separately so
+    /// future telemetry can distinguish the two.
+    func applyDrainedChunk(_ scores: [Float], start: Int) {
+        applyChunkScores(scores, start: start)
+    }
+
+    /// Wait for any in-flight live inference to land its scores before the
+    /// post-session drainer enumerates pending chunks. Without this, the
+    /// drainer could see the in-flight chunk as unscored, queue it for
+    /// re-scoring, and end up double-counting once the live continuation
+    /// also writes scores (running-sum + count would inflate the average).
+    func awaitInflight() async {
+        if let task = inflightTask {
+            await task.value
+        }
+    }
+
+    /// Authoritative list of chunk-start indices that still need scoring
+    /// after the user taps Stop. Computed by enumerating every full
+    /// 64-frame chunk inside `[recordingStart, frames.count)` and keeping
+    /// those whose first frame has `scoreCount == 0`. This is robust to
+    /// scheduler edge cases (in-flight, stashed, never-scheduled) and to
+    /// the live `stash` going stale because of a late-completing inference.
+    /// Chunks straddling `recordingStart` (their start is below it) are
+    /// dropped — the mp4 only contains frames from Start onward, so we
+    /// can't re-decode their pre-recording portion.
+    func chunksAwaitingPostProcessing(recordingStart: Int) -> [Int] {
+        let chunk = Self.chunkSize
+        let total = frames.count
+        // First chunk-start at or after `recordingStart`, on the global
+        // capture-index grid (chunks are aligned to 0, 64, 128, …).
+        let firstStart = ((recordingStart + chunk - 1) / chunk) * chunk
+        var pending: [Int] = []
+        var s = firstStart
+        while s + chunk <= total {
+            if frames.indices.contains(s), frames[s].scoreCount == 0 {
+                pending.append(s)
+            }
+            s += chunk
+        }
+        return pending
+    }
+
+    /// Forget the stashed chunk-starts. Called by `PostProcessor` once it's
+    /// scored every chunk in `chunksAwaitingPostProcessing`.
+    func clearStash() {
+        stash.removeAll()
+    }
+
     func reset() {
         frames.removeAll()
+        stash.removeAll()
         inferenceInflight = false
         nextChunkStart = 0
         inflightStart = -1
+        oldestLivePixelBuffer = 0
+        inflightTask = nil
     }
 
+    /// Release pixel buffers we no longer need. With non-overlapping chunks
+    /// + the latest-only live policy, only the in-flight chunk's 64 buffers
+    /// matter; everything older is either already scored (so the buffer's
+    /// served its purpose) or stashed (so the mp4 will re-supply it in
+    /// post-processing).
     private func dropOldBuffers() {
-        let total = frames.count
-        let keepLatestFrom = max(0, total - 128)
-        let pendingLow = inferenceInflight ? min(inflightStart, nextChunkStart) : nextChunkStart
-
-        for i in 0..<keepLatestFrom where frames[i].pixelBuffer != nil {
-            if i < pendingLow {
-                frames[i].pixelBuffer = nil
-            }
+        let keepStart = inferenceInflight ? inflightStart : nextChunkStart
+        while oldestLivePixelBuffer < keepStart, oldestLivePixelBuffer < frames.count {
+            frames[oldestLivePixelBuffer].pixelBuffer = nil
+            oldestLivePixelBuffer += 1
         }
     }
 
     private func kickInferenceIfReady() {
         guard !inferenceInflight, let inference else { return }
+        let chunk = Self.chunkSize
         let total = frames.count
-        let chunkSize = Self.chunkSize
+        // Highest chunk-start whose 64 frames are all captured. `-1` means
+        // "no full chunk available yet"; the guard below catches that.
+        let latestReadyStart = ((total / chunk) - 1) * chunk
+        guard latestReadyStart >= nextChunkStart else { return }
 
-        // Skip-queued: when inference can't keep up with capture, skip past
-        // older fully-captured chunks and jump to the latest one. The frames
-        // in skipped chunks stay scoreless — those gaps show up as holes in
-        // the timeline. Only enabled for the slow 64-frame walking debug
-        // evaluation; everyone else processes chunks in order.
-        if inference.evaluation.skipQueuedChunks {
-            while nextChunkStart + chunkShift + chunkSize - 1 < total {
-                nextChunkStart += chunkShift
-            }
+        // Stash every ready chunk older than `latestReadyStart` so the post-
+        // session drain knows to re-score them. Their pixel buffers can be
+        // released right after.
+        var s = nextChunkStart
+        while s < latestReadyStart {
+            stash.append(s)
+            s += chunk
         }
 
-        let start = nextChunkStart
-        let end = start + chunkSize - 1
-        guard end < total else { return }
-
+        let start = latestReadyStart
+        let end = start + chunk - 1
         let buffers = frames[start...end].compactMap { $0.pixelBuffer }
-        guard buffers.count == chunkSize else { return }
+        guard buffers.count == chunk else {
+            // We dropped a buffer we still need (shouldn't happen — the
+            // dropOldBuffers guard keeps the in-flight chunk's buffers
+            // intact). Defensively stash this chunk and advance.
+            stash.append(start)
+            nextChunkStart = start + chunk
+            return
+        }
 
         inferenceInflight = true
         inflightStart = start
-        nextChunkStart = start + chunkShift
+        nextChunkStart = start + chunk
+        dropOldBuffers()
 
-        Task.detached { [weak self] in
+        inflightTask = Task.detached { [weak self] in
             do {
                 let scores = try await inference.run(buffers: buffers)
                 await MainActor.run {
@@ -155,6 +230,7 @@ final class FrameBuffer {
     private func finishInflight() {
         inferenceInflight = false
         inflightStart = -1
+        inflightTask = nil
         dropOldBuffers()
         kickInferenceIfReady()
     }
@@ -162,6 +238,7 @@ final class FrameBuffer {
     private func handleInferenceError(_ error: Error) {
         inferenceInflight = false
         inflightStart = -1
+        inflightTask = nil
         onError(error)
     }
 }

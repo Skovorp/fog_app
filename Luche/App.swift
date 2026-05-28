@@ -20,6 +20,10 @@ enum AppPhase: Equatable {
     case menu
     case instructions(Evaluation)
     case live(Evaluation)
+    /// Post-session "fill in skipped chunks" phase. The PostProcessor owns
+    /// FrameBuffer + Inference + the mp4 URL so they survive the screen
+    /// transition out of `.live(_)`.
+    case processing(PostProcessor)
     case results(Session)
     case error(message: String)
 }
@@ -31,6 +35,7 @@ final class AppState {
 
     func select(_ evaluation: Evaluation) { phase = .instructions(evaluation) }
     func confirm(_ evaluation: Evaluation) { phase = .live(evaluation) }
+    func processing(_ processor: PostProcessor) { phase = .processing(processor) }
     func finished(_ session: Session) { phase = .results(session) }
     func backToMenu() { phase = .menu }
     func fail(_ message: String) { phase = .error(message: message) }
@@ -170,6 +175,8 @@ struct RootView: View {
                 InstructionScreen(evaluation: evaluation)
             case .live(let evaluation):
                 LiveRecordingScreen(evaluation: evaluation)
+            case .processing(let processor):
+                ProcessingScreen(processor: processor)
             case .results(let session):
                 ResultsScreen(session: session)
             case .error(let message):

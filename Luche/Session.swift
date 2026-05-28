@@ -62,8 +62,8 @@ struct Session: Identifiable, Codable, Hashable {
     }
 
     /// Threshold above which a frame is counted as "fog". 0.5 matches the
-    /// model's default operating point — RESULTS.md run_06 (the no-pool
-    /// 256/16f/step4 config) is well-calibrated at this threshold.
+    /// FoG classifier's operating point. Only meaningful for the FoG head —
+    /// the regression heads use the evaluation's full `scoreRange` instead.
     static let fogThreshold: Float = 0.5
 
     var totalFrames: Int { scores.count }
@@ -74,21 +74,27 @@ struct Session: Identifiable, Codable, Hashable {
     }
     var duration: TimeInterval { endedAt.timeIntervalSince(startedAt) }
 
-    /// Mean of the per-frame [0, 1] scores. For the regression heads (walking
-    /// / chair / tapping) this is treated as a "severity" / "trouble with the
-    /// task" probability — UPDRS-adjacent but not on the official 0-4 scale,
-    /// because the training datasets were too small / narrow.
+    /// Mean of the per-frame scores. Range matches the evaluation's
+    /// `scoreRange.upperBound`: [0, 1] for FoG / chair, [0, 4] for walking /
+    /// tapping (raw MDS-UPDRS). For regression heads this is a clamped mean
+    /// of one scalar per chunk stamped onto its frames.
     var avgProbability: Double {
         guard !scores.isEmpty else { return 0 }
         let sum = scores.reduce(Float(0), +)
         return Double(sum) / Double(scores.count)
     }
-    /// Headline 0-1 severity score (kept name for backward-compat with stored
-    /// sessions; the value is now a [0, 1] probability rather than a 0-4
-    /// UPDRS score).
+    /// Headline severity score. Name kept for backward-compat with stored
+    /// sessions; the *range* now depends on `effectiveEvaluation.scoreRange`
+    /// — 0..1 for chair, 0..4 for walking / tapping.
     var updrsScore: Double { avgProbability }
+    /// Five-bucket band over the evaluation's full score range. We normalize
+    /// `updrsScore` by `scoreRange.upperBound` so the bucket boundaries (12.5
+    /// / 37.5 / 62.5 / 87.5 % of range) line up with chair's old [0,1]
+    /// thresholds *and* walking / tapping's [0,4] scale.
     var updrsBand: String {
-        switch updrsScore {
+        let upper = Double(effectiveEvaluation.scoreRange.upperBound)
+        let normalized = updrsScore / Swift.max(upper, .leastNonzeroMagnitude)
+        switch normalized {
         case ..<0.125: return "Normal"
         case ..<0.375: return "Slight"
         case ..<0.625: return "Mild"

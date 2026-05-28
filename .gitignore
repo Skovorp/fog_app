@@ -33,3 +33,6 @@ Luche/FreezingModel.mlpackage/
 
 # App Store screenshot output (keep the script, drop the renders)
 appstore/*.png
+
+# Transient ML export log
+export_64f.log

@@ -83,8 +83,19 @@ struct ResultsScreen: View {
                     .multilineTextAlignment(.center)
             }
         } else {
+            // Headline value scaled to the evaluation's display range.
+            //   - Chair (0–1): show "0.42" alone.
+            //   - Walking / Tapping (0–4): show "1.85 / 4" so the raw
+            //     MDS-UPDRS scale is unambiguous.
+            let upper = evaluation.scoreRange.upperBound
+            let valueText: String = {
+                if upper > 1 {
+                    return String(format: "%.2f / %.0f", session.updrsScore, Double(upper))
+                }
+                return String(format: "%.2f", session.updrsScore)
+            }()
             VStack(spacing: 6) {
-                Text(String(format: "%.2f", session.updrsScore))
+                Text(valueText)
                     .font(.system(size: 72, weight: .bold, design: .rounded))
                     .foregroundStyle(.lucheInk)
                 Text(session.updrsBand)

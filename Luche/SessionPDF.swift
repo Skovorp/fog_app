@@ -68,6 +68,8 @@ enum SessionPDF {
         // Stats — 4 columns spread across the page; columns depend on evaluation
         let durMin = Int(session.duration) / 60
         let durSec = Int(session.duration) % 60
+        let upper = Double(evaluation.scoreRange.upperBound)
+        let scoreLabel = "Score (0-\(upper == upper.rounded() ? String(format: "%.0f", upper) : String(format: "%.1f", upper)))"
         let stats: [(String, String)]
         if isFog {
             stats = [
@@ -80,7 +82,7 @@ enum SessionPDF {
             stats = [
                 ("Duration", "\(durMin)m \(durSec)s"),
                 ("Total frames", "\(session.totalFrames)"),
-                ("Score (0-1)", String(format: "%.2f", session.updrsScore)),
+                (scoreLabel, String(format: "%.2f", session.updrsScore)),
                 ("Band", session.updrsBand),
             ]
         }
@@ -104,7 +106,12 @@ enum SessionPDF {
             width: rect.width - 2 * margin - 32,
             height: rect.height - y - margin - 30
         )
-        drawGraph(scores: session.scores, in: graphRect, showFogThreshold: isFog)
+        drawGraph(
+            scores: session.scores,
+            in: graphRect,
+            scoreRange: evaluation.scoreRange,
+            showFogThreshold: isFog
+        )
 
         // Footer
         let footer = "Luche"
@@ -145,7 +152,12 @@ enum SessionPDF {
         return rect.minY + labelHeight + 4 + valueHeight
     }
 
-    private static func drawGraph(scores: [Float], in rect: CGRect, showFogThreshold: Bool) {
+    private static func drawGraph(
+        scores: [Float],
+        in rect: CGRect,
+        scoreRange: ClosedRange<Float>,
+        showFogThreshold: Bool
+    ) {
         guard let ctx = UIGraphicsGetCurrentContext() else { return }
 
         let labelAttrs: [NSAttributedString.Key: Any] = [
@@ -158,10 +170,16 @@ enum SessionPDF {
         ctx.setLineWidth(0.5)
         ctx.stroke(rect)
 
-        // Y-axis gridlines + labels (0, 0.25, 0.5, 0.75, 1.0)
-        for v in stride(from: 0.0, through: 1.0, by: 0.25) {
-            let yPos = rect.maxY - rect.height * CGFloat(v)
-            let label = String(format: "%.2f", v)
+        // Y-axis gridlines + labels at five evenly-spaced stops across the
+        // score range. 0/0.25/0.5/0.75/1.0 for [0,1]; 0/1/2/3/4 for [0,4].
+        let lo = Double(scoreRange.lowerBound)
+        let hi = Double(scoreRange.upperBound)
+        let span = max(hi - lo, .leastNonzeroMagnitude)
+        let useRawScale = hi > 1.0
+        for fraction in stride(from: 0.0, through: 1.0, by: 0.25) {
+            let yPos = rect.maxY - rect.height * CGFloat(fraction)
+            let raw = lo + fraction * span
+            let label = useRawScale ? String(format: "%.0f", raw) : String(format: "%.2f", raw)
             let labelSize = (label as NSString).size(withAttributes: labelAttrs)
             (label as NSString).draw(
                 at: CGPoint(x: rect.minX - labelSize.width - 6, y: yPos - labelSize.height / 2),
@@ -214,15 +232,17 @@ enum SessionPDF {
             ctx.setLineDash(phase: 0, lengths: [])
         }
 
-        // Score line
+        // Score line. Normalize per the evaluation's score range so the
+        // same plot box works for FoG/chair (0–1) and walking/tapping (0–4).
         ctx.setStrokeColor(UIColor.lucheInk.cgColor)
         ctx.setLineWidth(0.9)
         ctx.beginPath()
         let denom = CGFloat(max(n - 1, 1))
         for (idx, score) in scores.enumerated() {
             let x = rect.minX + rect.width * CGFloat(idx) / denom
-            let clamped = max(0, min(1, CGFloat(score)))
-            let yPos = rect.maxY - rect.height * clamped
+            let clipped = Swift.max(lo, Swift.min(hi, Double(score)))
+            let normalized = (clipped - lo) / span
+            let yPos = rect.maxY - rect.height * CGFloat(normalized)
             if idx == 0 {
                 ctx.move(to: CGPoint(x: x, y: yPos))
             } else {
