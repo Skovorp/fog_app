@@ -362,7 +362,18 @@ struct LiveRecordingScreen: View {
         let endedAtCopy = stoppedAt
         let mp4OriginCopy = mp4Origin
         appState.processing(processor)
-        processor.start { [appState] in
+        processor.start { [appState, processor] in
+            // If the drain failed (AVAssetReader couldn't open the mp4, an
+            // inference call threw, etc.), the FrameBuffer has only the
+            // live-scored chunks and the skipped ones are still unscored.
+            // Persisting that would silently collapse the saved score
+            // timeline; better to surface the failure, orphan the mp4, and
+            // let the user retry.
+            if let err = processor.lastError {
+                if let f = videoFilenameCopy { VideoStore.delete(filename: f) }
+                appState.fail("Couldn't finish scoring: \(err)")
+                return
+            }
             let session = Self.buildSession(
                 buffer: buf,
                 evaluation: evaluationCopy,
@@ -376,7 +387,8 @@ struct LiveRecordingScreen: View {
                 savedSessions.add(session)
                 appState.finished(session)
             } else {
-                // Drain ran but produced nothing scoreable — orphan the mp4
+                // Drain succeeded but the window produced no scoreable
+                // frames (e.g. recording was too short) — orphan the mp4
                 // and bounce home.
                 if let f = videoFilenameCopy { VideoStore.delete(filename: f) }
                 appState.backToMenu()
