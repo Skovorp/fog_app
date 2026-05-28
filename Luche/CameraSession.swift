@@ -28,7 +28,13 @@ final class CameraSession: NSObject {
     private let videoQueue = DispatchQueue(label: "luche.camera.video", qos: .userInitiated)
     private var output: AVCaptureVideoDataOutput?
     private var device: AVCaptureDevice?
-    private var onFrame: ((CVPixelBuffer) -> Void)?
+    /// Per-frame callback. The Bool flag is `true` only when this exact sample
+    /// also made it into the recorded mp4 — frames dropped by the writer
+    /// (`input.isReadyForMoreMediaData == false` under back-pressure on slow
+    /// devices) are filtered out before this fires, so FrameBuffer's index
+    /// stays in lock-step with the mp4. The flag is always `false` during
+    /// preview (no mp4 URL set yet).
+    private var onFrame: ((CVPixelBuffer, Bool) -> Void)?
 
     /// Writer is non-isolated and only ever touched from `videoQueue`.
     private nonisolated let videoWriter = VideoWriter()
@@ -47,7 +53,9 @@ final class CameraSession: NSObject {
 
     /// `videoURL` (when non-nil) is the file the AVAssetWriter will write to.
     /// Pass nil to skip recording (e.g. simulator or low-storage scenarios).
-    func start(videoURL: URL?, onFrame: @escaping (CVPixelBuffer) -> Void) async {
+    /// The `onFrame` callback's `isRecorded` parameter is `true` only when the
+    /// sample also made it into the mp4 — see the property doc on `onFrame`.
+    func start(videoURL: URL?, onFrame: @escaping (CVPixelBuffer, Bool) -> Void) async {
         self.onFrame = onFrame
 
         let granted = await AVCaptureDevice.requestAccess(for: .video)
@@ -255,16 +263,34 @@ extension CameraSession: AVCaptureVideoDataOutputSampleBufferDelegate {
     ) {
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
 
-        // 1. Append to the video file (no-op when no URL was set).
-        videoWriter.handle(sampleBuffer)
+        // 1. Hand the sample to the mp4 writer first. During preview
+        //    (no pending URL) this is a no-op that returns `false`.
+        //    During recording it returns `true` only when the sample
+        //    actually made it into the file — `input.isReadyForMoreMediaData`
+        //    can briefly go false under back-pressure on slow devices,
+        //    in which case the writer drops the sample.
+        let isRecording = videoWriter.isRecording
+        let accepted = videoWriter.handle(sampleBuffer)
 
-        // 2. Forward a deep copy to the inference path on main.
+        // 2. Keep the inference path strictly in lock-step with the mp4: if
+        //    the writer dropped this sample mid-recording, drop it from the
+        //    inference path too. Without this gate the FrameBuffer would
+        //    accumulate frames that aren't in the saved mp4, and the post-
+        //    session drain would re-decode at shifted indices and score
+        //    chunks against the wrong pixels.
+        if isRecording && !accepted { return }
+
+        // 3. Forward a deep copy to the inference path on main. `isRecorded`
+        //    is true only when this exact sample also became an mp4 frame
+        //    (false during preview); LiveRecordingScreen uses the first
+        //    `true` to anchor mp4-frame-0 ↔ FrameBuffer-index mapping.
         let copied = Self.copyPixelBuffer(pixelBuffer)
+        let isRecorded = isRecording && accepted
         Task { @MainActor [weak self] in
             guard let self else { return }
             guard self.phase == .capturing else { return }
             self.frameCount &+= 1
-            self.onFrame?(copied)
+            self.onFrame?(copied, isRecorded)
         }
     }
 
@@ -307,6 +333,11 @@ final class VideoWriter: @unchecked Sendable {
     private var pendingURL: URL?
     private var started = false
 
+    /// True while a recording is active (the destination URL is set, even
+    /// before the first sample has triggered `setup`). Read from `videoQueue`
+    /// only — the field changes there too, so no synchronization is needed.
+    var isRecording: Bool { pendingURL != nil }
+
     /// Set the destination for the next capture. Pass nil to disable recording.
     /// Must be called before the first sample buffer arrives.
     func reset(url: URL?) {
@@ -319,14 +350,22 @@ final class VideoWriter: @unchecked Sendable {
     /// Append a sample buffer if recording is active. Lazily configures the
     /// writer using the first buffer's dimensions so the file resolution
     /// matches whatever the connection actually produces (post-rotation).
-    func handle(_ sampleBuffer: CMSampleBuffer) {
-        guard let url = pendingURL else { return }
+    ///
+    /// Returns `true` only when the sample was successfully appended to the
+    /// mp4. Returns `false` during preview (no pending URL) and whenever the
+    /// asset writer's input isn't ready for more data (back-pressure on slow
+    /// devices). Callers must use the return value (together with
+    /// `isRecording`) to decide whether to keep this sample on the inference
+    /// path — that's how `CameraSession` stays in lock-step with the mp4.
+    @discardableResult
+    func handle(_ sampleBuffer: CMSampleBuffer) -> Bool {
+        guard let url = pendingURL else { return false }
         if !started {
             setup(url: url, sampleBuffer: sampleBuffer)
             started = true
         }
-        guard let input, input.isReadyForMoreMediaData else { return }
-        input.append(sampleBuffer)
+        guard let input, input.isReadyForMoreMediaData else { return false }
+        return input.append(sampleBuffer)
     }
 
     /// Finalize the file. Calls completion when the .mp4 is fully on disk.

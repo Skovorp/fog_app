@@ -74,27 +74,20 @@ struct Session: Identifiable, Codable, Hashable {
     }
     var duration: TimeInterval { endedAt.timeIntervalSince(startedAt) }
 
-    /// Mean of the per-frame scores. Range matches the evaluation's
-    /// `scoreRange.upperBound`: [0, 1] for FoG / chair, [0, 4] for walking /
-    /// tapping (raw MDS-UPDRS). For regression heads this is a clamped mean
-    /// of one scalar per chunk stamped onto its frames.
+    /// Mean of the per-frame [0, 1] scores. Every head normalizes into this
+    /// range upstream in `Inference.normalizeForCaptureFrames` (FoG / chair
+    /// pass through, walking / tapping clamp at 3 and divide by 3), so the
+    /// average is comparable across evaluations.
     var avgProbability: Double {
         guard !scores.isEmpty else { return 0 }
         let sum = scores.reduce(Float(0), +)
         return Double(sum) / Double(scores.count)
     }
-    /// Headline severity score. Name kept for backward-compat with stored
-    /// sessions; the *range* now depends on `effectiveEvaluation.scoreRange`
-    /// — 0..1 for chair, 0..4 for walking / tapping.
+    /// Headline severity score in [0, 1]. Kept under the historical name
+    /// `updrsScore` for stored-session backward compatibility.
     var updrsScore: Double { avgProbability }
-    /// Five-bucket band over the evaluation's full score range. We normalize
-    /// `updrsScore` by `scoreRange.upperBound` so the bucket boundaries (12.5
-    /// / 37.5 / 62.5 / 87.5 % of range) line up with chair's old [0,1]
-    /// thresholds *and* walking / tapping's [0,4] scale.
     var updrsBand: String {
-        let upper = Double(effectiveEvaluation.scoreRange.upperBound)
-        let normalized = updrsScore / Swift.max(upper, .leastNonzeroMagnitude)
-        switch normalized {
+        switch updrsScore {
         case ..<0.125: return "Normal"
         case ..<0.375: return "Slight"
         case ..<0.625: return "Mild"

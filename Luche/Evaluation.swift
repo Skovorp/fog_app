@@ -131,18 +131,28 @@ enum Evaluation: String, Codable, CaseIterable, Identifiable, Hashable {
         }
     }
 
-    /// Per-evaluation display / clamp range for a single frame score.
-    ///   - FoG: per-frame fog probability in [0, 1].
-    ///   - Chair: 0–1. Training labels for `exp_chair_strong_with_negs` are
-    ///     50% raw=0 and 50% raw=1, never 2–4, so clamping above 1 is noise.
-    ///   - Walking / Tapping: raw MDS-UPDRS 0–4 scale. Training labels span
-    ///     0–3 with mean ≈ 1.1; we expose the full 0–4 schema so the bar
-    ///     can show severe-end outliers if they appear.
-    /// See `wiki/ios-app/symptoms/<head>` for train-label histograms.
-    var scoreRange: ClosedRange<Float> {
+    /// Range applied to the raw Core ML output **before** normalizing into
+    /// the canonical [0, 1] per-frame score the rest of the app stores and
+    /// displays. The Inference layer does `score = (clamp(raw, lo, hi) - lo)
+    /// / (hi - lo)`, so picking the right `clampRange` is the only
+    /// per-evaluation calibration knob.
+    ///
+    ///   - **FoG**: per-frame fog probability is already in [0, 1]; the
+    ///     clamp at 1 just filters NaN / overflow noise.
+    ///   - **Chair**: regression output ≈ [0, 1]; training labels are 50%
+    ///     raw=0 and 50% raw=1, never 2+.
+    ///   - **Walking / Tapping**: denormalized regression output spans
+    ///     roughly [0, 4]; training labels only ever go up to raw=3 (mean
+    ///     ≈ 1.1, no 4s observed). Clamp at 3 to fence off untrained
+    ///     outliers, then divide by 3 so the saved score is a [0, 1]
+    ///     "fraction of seen severity" comparable to chair / FoG.
+    ///
+    /// See `wiki/ios-app/symptoms/<head>` for the per-head train-label
+    /// histograms that justify the upper bound.
+    var clampRange: ClosedRange<Float> {
         switch self {
         case .freezingOfGait, .arisingFromChair: return 0.0...1.0
-        case .gait, .fingerTapping:              return 0.0...4.0
+        case .gait, .fingerTapping:              return 0.0...3.0
         }
     }
 

@@ -5,20 +5,20 @@ import Foundation
 /// Wraps one of the FERAL Core ML packages. Two output shapes are handled:
 ///
 ///   - **Per-frame (FoG)** — output `scores`, shape (1, 64). One probability
-///     per captured frame in [0, 1]. Clamped (filters NaN/overflow) and
+///     per captured frame in [0, 1]. Clamped (filters NaN / overflow) and
 ///     returned as-is.
 ///   - **Chunk-level regression (walking / chair / tapping)** — output
 ///     `updrs_score`, shape (1,). A single denormalized scalar (the head's
-///     `mean + std * z`) for the whole chunk. Clamped to the evaluation's
-///     `scoreRange` (chair → [0, 1] because train labels are 50/50 at 0 and
-///     1; walking / tapping → [0, 4] raw MDS-UPDRS) and stamped to all 64
-///     capture frames in the chunk so the score bar and saved Session stay
-///     homogeneous.
+///     `mean + std * z`) for the whole chunk. Clamped into the evaluation's
+///     `clampRange` (chair → [0, 1], walking / tapping → [0, 3]) and then
+///     **normalized by `clampRange.upperBound`** so every head produces
+///     per-frame scores in [0, 1] regardless of the underlying raw scale.
+///     The normalized value is stamped to all 64 capture frames so the
+///     score bar and saved Session stay homogeneous.
 ///
-/// Both contracts produce a `[Float]` of length `evaluation.captureFramesPerChunk`
-/// to the caller. The per-frame score range is reported by
-/// `evaluation.scoreRange`; the rest of the pipeline (FrameBuffer,
-/// FrameBarView, Session) normalizes by `upperBound` for display.
+/// The rest of the pipeline (FrameBuffer, FrameBarView, Session, results
+/// screen, PDF) assumes scores ∈ [0, 1] uniformly — no per-evaluation
+/// branching needed downstream.
 final class Inference: @unchecked Sendable {
     let evaluation: Evaluation
     private let model: MLModel
@@ -53,9 +53,10 @@ final class Inference: @unchecked Sendable {
         }
     }
 
-    /// Run inference on `captureFramesPerChunk` raw camera frames. Returns one
-    /// score in `evaluation.scoreRange` per capture frame, regardless of
-    /// which underlying model is loaded.
+    /// Run inference on `captureFramesPerChunk` raw camera frames. Returns
+    /// one score in [0, 1] per capture frame, regardless of which underlying
+    /// model is loaded — see `normalizeForCaptureFrames` for the per-head
+    /// clamp + normalize.
     func run(buffers: [CVPixelBuffer]) async throws -> [Float] {
         precondition(buffers.count == evaluation.captureFramesPerChunk,
                      "Expected \(evaluation.captureFramesPerChunk) frames, got \(buffers.count)")
@@ -94,25 +95,37 @@ final class Inference: @unchecked Sendable {
         }
     }
 
-    /// Clamp the raw model output into the evaluation's display range, then
-    /// shape it into one score per capture frame:
+    /// Clamp raw model output into the evaluation's `clampRange`, then
+    /// **normalize into [0, 1]** by dividing by the range's upper bound, and
+    /// finally shape into one score per capture frame:
     ///
-    ///   - **FoG**: model emits 64 per-frame probabilities; clamp each one
-    ///     into [0, 1] to filter NaN / overflow noise and return as-is.
-    ///   - **Regression heads**: model emits one denormalized scalar. Clamp
-    ///     into `evaluation.scoreRange` (chair → [0, 1]; walking / tapping →
-    ///     [0, 4] raw MDS-UPDRS) and stamp it to all 64 capture frames so
-    ///     the FrameBuffer / FrameBarView / Session can stay range-agnostic.
+    ///   - **FoG**: model emits 64 per-frame probabilities. clampRange =
+    ///     [0, 1] → divide by 1 is a no-op; the clamp itself just filters
+    ///     NaN / overflow noise.
+    ///   - **Regression heads**: model emits one denormalized scalar.
+    ///     Chair clampRange = [0, 1] (no-op divide); walking / tapping
+    ///     clampRange = [0, 3] (divide by 3 → [0, 1] fraction-of-seen-
+    ///     severity). The normalized scalar is stamped onto all 64 frames
+    ///     of the chunk.
+    ///
+    /// Every downstream consumer can assume `score ∈ [0, 1]` uniformly.
     private static func normalizeForCaptureFrames(_ raw: [Float], evaluation: Evaluation) -> [Float] {
-        let lo = evaluation.scoreRange.lowerBound
-        let hi = evaluation.scoreRange.upperBound
-        let clamp: (Float) -> Float = { Swift.max(lo, Swift.min(hi, $0)) }
+        let lo = evaluation.clampRange.lowerBound
+        let hi = evaluation.clampRange.upperBound
+        // `.leastNonzeroMagnitude` is ambiguous between Float / Double /
+        // Duration here, so spell out the type or the compiler binds it
+        // to Duration and fails.
+        let span = Swift.max(hi - lo, Float.leastNonzeroMagnitude)
+        let normalize: (Float) -> Float = {
+            let clamped = Swift.max(lo, Swift.min(hi, $0))
+            return (clamped - lo) / span
+        }
         if evaluation.outputIsPerFrame {
-            return raw.map(clamp)
+            return raw.map(normalize)
         }
         let scalar = raw.first ?? .nan
-        let clamped = clamp(scalar)
-        return Array(repeating: clamped, count: evaluation.captureFramesPerChunk)
+        let value = normalize(scalar)
+        return Array(repeating: value, count: evaluation.captureFramesPerChunk)
     }
 
     private static func unpack(_ arr: MLMultiArray) -> [Float] {

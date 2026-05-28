@@ -35,19 +35,27 @@ final class PostProcessor: Equatable {
     let buffer: FrameBuffer
     let inference: Inference
     let videoURL: URL
-    let recordingStart: Int
+    /// FrameBuffer index that maps to mp4 frame 0. Set by `LiveRecordingScreen`
+    /// to `firstRecordedFrameIndex` — the index of the first sample the
+    /// AVAssetWriter actually accepted, not the (earlier) Start-tap moment.
+    /// Using the writer-anchored origin keeps mp4 frame *i* identical to
+    /// `FrameBuffer` index `firstRecordedFrameIndex + i`, even on slow
+    /// devices where the writer occasionally drops samples under back-
+    /// pressure (those drops are also gated out of the inference path in
+    /// `CameraSession.captureOutput`, so the two streams stay in lock-step).
+    let firstRecordedFrameIndex: Int
     private let pending: [Int]
     private var onFinished: (() -> Void)?
 
     init(buffer: FrameBuffer,
          inference: Inference,
          videoURL: URL,
-         recordingStartFrameIndex: Int) {
+         firstRecordedFrameIndex: Int) {
         self.buffer = buffer
         self.inference = inference
         self.videoURL = videoURL
-        self.recordingStart = recordingStartFrameIndex
-        let pendingList = buffer.chunksAwaitingPostProcessing(recordingStart: recordingStartFrameIndex)
+        self.firstRecordedFrameIndex = firstRecordedFrameIndex
+        let pendingList = buffer.chunksAwaitingPostProcessing(recordingStart: firstRecordedFrameIndex)
         self.pending = pendingList
         self.total = pendingList.count
     }
@@ -79,14 +87,15 @@ final class PostProcessor: Equatable {
     }
 
     /// Sequential pass over the saved mp4. mp4-frame *i* maps to
-    /// `FrameBuffer` index `recordingStart + i` (the mp4 starts at the
-    /// Start tap; the FrameBuffer started indexing from the camera's first
-    /// preview frame). Each pending chunk's 64 frames are collected and
-    /// fed to `Inference.run` as soon as the 64th arrives.
+    /// `FrameBuffer` index `firstRecordedFrameIndex + i`. The mapping is
+    /// exact because `CameraSession.captureOutput` only forwards a sample
+    /// to the FrameBuffer when the writer also accepted it (writer drops
+    /// under back-pressure are filtered out of both streams), so both
+    /// streams advance by exactly the same set of frames.
     private func decodeAndScore() async throws {
         let pendingSet = Set(pending)
         let chunkSize = FrameBuffer.chunkSize
-        let recordingStart = self.recordingStart
+        let recordingStart = self.firstRecordedFrameIndex
         let url = self.videoURL
         let inference = self.inference
 

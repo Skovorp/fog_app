@@ -33,9 +33,17 @@ struct LiveRecordingScreen: View {
     @State private var sessionID: UUID = UUID()
     @State private var videoFilename: String?
     @State private var isStopping: Bool = false
-    /// Index in `frameBuffer.frames` of the first frame that counts toward the
-    /// saved Session. Frames before this are preview only.
+    /// Index in `frameBuffer.frames` of the frame that was current when the
+    /// user tapped Start. Used as a fallback boundary if the camera never
+    /// successfully accepts an mp4 frame (e.g. simulator).
     @State private var recordingStartFrameIndex: Int = 0
+    /// Index in `frameBuffer.frames` of the *first frame that landed in the
+    /// mp4*. Set from inside the camera callback the moment we see
+    /// `isRecorded == true`. Slightly higher than `recordingStartFrameIndex`
+    /// due to the async hop between Start tap → videoQueue.beginRecording →
+    /// next captured sample. The drainer + Session slicer use this so the
+    /// mp4 ↔ FrameBuffer index mapping is exact, no off-by-one.
+    @State private var firstRecordedFrameIndex: Int?
 
     private var isReady: Bool { isModelLoaded && isCameraReady }
 
@@ -62,7 +70,7 @@ struct LiveRecordingScreen: View {
             VStack {
                 Spacer()
                 if let frameBuffer, isReady {
-                    FrameBarView(frames: frameBuffer.frames, scoreRange: evaluation.scoreRange)
+                    FrameBarView(frames: frameBuffer.frames)
                 }
             }
             .ignoresSafeArea()
@@ -238,9 +246,14 @@ struct LiveRecordingScreen: View {
 
         // Start the camera in preview-only mode (no mp4 URL yet). Every frame
         // flows into the FrameBuffer so the bar populates immediately; the
-        // mp4 writer is attached later on the Start tap.
-        await camera.start(videoURL: nil) { buffer in
+        // mp4 writer is attached later on the Start tap. `isRecorded` is
+        // `true` exactly when the sample also made it into the mp4 — we use
+        // the first such frame to anchor mp4-frame-0 ↔ FrameBuffer-index.
+        await camera.start(videoURL: nil) { buffer, isRecorded in
             Task { @MainActor in
+                if isRecorded, self.firstRecordedFrameIndex == nil {
+                    self.firstRecordedFrameIndex = buf.frames.count
+                }
                 buf.append(buffer: buffer)
             }
         }
@@ -306,7 +319,12 @@ struct LiveRecordingScreen: View {
             return
         }
 
-        let pending = buf.chunksAwaitingPostProcessing(recordingStart: recordingStartFrameIndex)
+        // Use the writer-anchored origin where available so chunks/scores
+        // line up with the mp4 frame-for-frame. Fallback to the Start-tap
+        // index only if the writer never accepted a sample (rare — would
+        // mean a recording with no mp4 frames).
+        let mp4Origin = firstRecordedFrameIndex ?? recordingStartFrameIndex
+        let pending = buf.chunksAwaitingPostProcessing(recordingStart: mp4Origin)
         if pending.isEmpty {
             // Live scheduler kept up — no drain needed.
             if let session = saveCurrentSession() {
@@ -322,7 +340,7 @@ struct LiveRecordingScreen: View {
             buffer: buf,
             inference: inferenceObject,
             videoURL: videoURL,
-            recordingStartFrameIndex: recordingStartFrameIndex
+            firstRecordedFrameIndex: mp4Origin
         )
         // Snapshot what the build closure needs so it can run after this
         // screen disappears.
@@ -331,7 +349,7 @@ struct LiveRecordingScreen: View {
         let videoFilenameCopy = videoFilename
         let sessionIDCopy = sessionID
         let startedAtCopy = startedAt
-        let recordingStartCopy = recordingStartFrameIndex
+        let mp4OriginCopy = mp4Origin
         appState.processing(processor)
         processor.start { [appState] in
             let session = Self.buildSession(
@@ -340,7 +358,7 @@ struct LiveRecordingScreen: View {
                 sessionID: sessionIDCopy,
                 startedAt: startedAtCopy,
                 videoFilename: videoFilenameCopy,
-                recordingStartFrameIndex: recordingStartCopy
+                recordingStartFrameIndex: mp4OriginCopy
             )
             if let session {
                 savedSessions.add(session)
@@ -375,13 +393,16 @@ struct LiveRecordingScreen: View {
             cleanupOrphanVideo()
             return nil
         }
+        // Prefer the writer-anchored origin so the saved Session's scores
+        // line up with the mp4 1:1. Falls back to the Start-tap index when
+        // there's no writer (simulator) or no accepted frame yet.
         let session = Self.buildSession(
             buffer: frameBuffer,
             evaluation: evaluation,
             sessionID: sessionID,
             startedAt: startedAt,
             videoFilename: videoFilename,
-            recordingStartFrameIndex: recordingStartFrameIndex
+            recordingStartFrameIndex: firstRecordedFrameIndex ?? recordingStartFrameIndex
         )
         if let session {
             sessions.add(session)
@@ -433,13 +454,10 @@ struct LiveRecordingScreen: View {
     #if targetEnvironment(simulator)
     /// Synthetic frame stream for the simulator: appends a frame every ~42 ms
     /// and runs synthetic 64-frame chunks back-to-back (no overlap) so the
-    /// simulator mirrors the on-device non-overlapping pipeline.
+    /// simulator mirrors the on-device non-overlapping pipeline. Scores are
+    /// synthesized in [0, 1] directly to match the post-`Inference` contract.
     private func startSimulatorStream(into buf: FrameBuffer) {
         simTimer?.invalidate()
-        let range = evaluation.scoreRange
-        let lo = range.lowerBound
-        let hi = range.upperBound
-        let jitter = (hi - lo) * 0.25
         simTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 24.0, repeats: true) { _ in
             Task { @MainActor in
                 buf.appendSynthetic()
@@ -447,9 +465,9 @@ struct LiveRecordingScreen: View {
                 let size = FrameBuffer.chunkSize
                 if n >= size && n % size == 0 {
                     let start = n - size
-                    let base = Float.random(in: lo...hi)
+                    let base = Float.random(in: 0...1)
                     let scores: [Float] = (0..<size).map { _ in
-                        Swift.max(lo, Swift.min(hi, base + Float.random(in: -jitter...jitter)))
+                        Swift.max(0, Swift.min(1, base + Float.random(in: -0.25...0.25)))
                     }
                     buf.applySyntheticChunk(scores, start: start)
                 }
