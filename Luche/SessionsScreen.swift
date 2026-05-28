@@ -433,14 +433,17 @@ private struct SessionVideoPlayer: View {
     }
 
     var body: some View {
-        // VStack so the AVKit player owns the upper region (still
-        // immersive — fills all available space, native controls intact)
-        // and ScoreGraph occupies a 96 pt strip below. Background stays
-        // edge-to-edge black; the VStack contents respect the safe area
-        // so the graph isn't behind the home indicator.
+        // Video uses an explicit 16:9 aspect ratio so AVKit doesn't
+        // letterbox a tall portrait container with its own black bars
+        // (which conflicted with the surrounding lucheInk and produced
+        // a two-tone stripe top vs middle). The surrounding lucheInk
+        // now shows through uniformly. Spacers center the video + graph
+        // stack vertically.
         VStack(spacing: 0) {
+            Spacer(minLength: 0)
+
             VideoPlayer(player: player)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .aspectRatio(16.0 / 9.0, contentMode: .fit)
                 .onAppear { player.play() }
                 .onDisappear { player.pause() }
 
@@ -451,6 +454,8 @@ private struct SessionVideoPlayer: View {
                     threshold: graphThreshold
                 )
             }
+
+            Spacer(minLength: 0)
         }
         .background(Color.lucheInk.ignoresSafeArea())
         .overlay(alignment: .topTrailing) {

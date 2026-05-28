@@ -8,12 +8,13 @@ import SwiftUI
 ///     transport (play/pause/scrub/AirPlay/PiP). We only read its
 ///     `currentTime` and write it back on drag.
 ///   - This view paints the line + area + threshold + playhead.
-///   - `TimelineView(.animation)` schedules the canvas at display refresh
-///     without us managing a periodic time observer; SwiftUI invalidates
-///     the timeline once per frame and we pull `player.currentTime` inside.
+///   - Playhead motion is driven by `addPeriodicTimeObserver` updating
+///     `@State currentTime` — the canonical AVPlayer + SwiftUI pattern.
+///     `TimelineView(.animation)` was tried first but Canvas doesn't
+///     reliably invalidate when its only time-varying input is a non-
+///     observable method call (`player.currentTime`).
 ///   - Drag anywhere on the panel to seek; the gesture maps x → time using
-///     the same 16 px inset as the web build (matches the native scrubber's
-///     padding closely enough; can be tuned per simulator pass).
+///     the same 16 px inset as the web build.
 ///
 /// Path construction (line + area) happens inside the Canvas closure today.
 /// At ~750 frames per typical Luche clip this stays well above 60fps on the
@@ -33,13 +34,13 @@ struct ScoreGraph: View {
     private let panelHeight: CGFloat = 96
 
     @State private var duration: Double = 0
+    @State private var currentTime: Double = 0
+    @State private var observerToken: Any?
 
     var body: some View {
         GeometryReader { geo in
-            TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { _ in
-                Canvas { ctx, size in
-                    draw(into: ctx, size: size)
-                }
+            Canvas { ctx, size in
+                draw(into: ctx, size: size, at: currentTime)
             }
             .contentShape(Rectangle())
             .gesture(
@@ -48,13 +49,15 @@ struct ScoreGraph: View {
             )
         }
         .frame(height: panelHeight)
-        .background(panelBackground)
+        .background(Color.lucheInk)
         .task(id: ObjectIdentifier(player)) { await loadDuration() }
+        .onAppear(perform: attachObserver)
+        .onDisappear(perform: detachObserver)
     }
 
     // MARK: - Drawing
 
-    private func draw(into ctx: GraphicsContext, size: CGSize) {
+    private func draw(into ctx: GraphicsContext, size: CGSize, at currentTime: Double) {
         let n = scores.count
         guard n >= 2, size.width > 4, size.height > 4 else { return }
 
@@ -124,10 +127,10 @@ struct ScoreGraph: View {
             )
         }
 
-        // Playhead — read player time at draw time so TimelineView ticks
-        // pick up motion without us routing state through @State.
+        // Playhead — `currentTime` is driven by the periodic time observer
+        // (see attachObserver) so SwiftUI redraws Canvas on every tick.
         let dur = duration > 0 ? duration : 1
-        let frac = max(0, min(1, player.currentTime().seconds / dur))
+        let frac = max(0, min(1, currentTime / dur))
         let head = max(0, min(n - 1, Int((frac * Double(n - 1)).rounded(.down))))
         let hx = xOf(head)
         let hy = valY(scores[head])
@@ -169,19 +172,35 @@ struct ScoreGraph: View {
         }
     }
 
+    /// Subscribe to AVPlayer time updates at ~30 Hz on the main queue.
+    /// Each callback writes `currentTime`, which invalidates the body and
+    /// pulls Canvas through its renderer with the new playhead position.
+    /// 30 Hz is plenty for the playhead — display refresh would be wasted
+    /// work given the human-eye-perceptible motion threshold for a 1.5 px
+    /// vertical marker creeping across a 350 pt strip.
+    private func attachObserver() {
+        guard observerToken == nil else { return }
+        let interval = CMTime(seconds: 1.0 / 30.0, preferredTimescale: 600)
+        observerToken = player.addPeriodicTimeObserver(
+            forInterval: interval, queue: .main
+        ) { time in
+            currentTime = time.seconds
+        }
+    }
+
+    private func detachObserver() {
+        if let token = observerToken {
+            player.removeTimeObserver(token)
+            observerToken = nil
+        }
+    }
+
     // MARK: - Visual helpers
 
     private func scoreColor(_ v: Float) -> Color {
         let clipped = Double(max(0, min(1, v)))
         let hue = (1 - clipped) * 0.33  // 0 = red, 0.33 = green
         return Color(hue: hue, saturation: 0.85, brightness: 0.95)
-    }
-
-    private var panelBackground: some View {
-        LinearGradient(
-            colors: [Color(white: 0.07), Color(white: 0.04)],
-            startPoint: .top, endPoint: .bottom
-        )
     }
 }
 
