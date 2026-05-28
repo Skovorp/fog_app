@@ -292,16 +292,26 @@ struct LiveRecordingScreen: View {
     ///     advancing to `.results`.
     @MainActor
     private func stopAndSave() async {
+        // Capture the moment of the Stop tap up front so `Session.duration`
+        // reflects only recording time, not mp4 finalization + drain. If we
+        // grabbed `Date()` inside the build closure instead, a long drain
+        // on a slow device would inflate the saved duration.
+        let stoppedAt = Date()
         simTimer?.invalidate()
         simTimer = nil
         #if !targetEnvironment(simulator)
         await camera.stop()
+        // Freeze the live scheduler BEFORE awaiting the in-flight chunk.
+        // If we let `finishInflight()` kick another live chunk after the
+        // current one lands, it would race with the `PostProcessor` over
+        // the same unscored chunks and double-write their scores.
+        frameBuffer?.stopScheduling()
         await frameBuffer?.awaitInflight()
         #endif
 
         // Simulator (no real mp4, no PostProcessor) — direct path.
         #if targetEnvironment(simulator)
-        if let session = saveCurrentSession() {
+        if let session = saveCurrentSession(endedAt: stoppedAt) {
             appState.finished(session)
         } else {
             appState.backToMenu()
@@ -311,7 +321,7 @@ struct LiveRecordingScreen: View {
         guard let buf = frameBuffer,
               let inferenceObject = inference,
               let filename = videoFilename else {
-            if let session = saveCurrentSession() {
+            if let session = saveCurrentSession(endedAt: stoppedAt) {
                 appState.finished(session)
             } else {
                 appState.backToMenu()
@@ -327,7 +337,7 @@ struct LiveRecordingScreen: View {
         let pending = buf.chunksAwaitingPostProcessing(recordingStart: mp4Origin)
         if pending.isEmpty {
             // Live scheduler kept up — no drain needed.
-            if let session = saveCurrentSession() {
+            if let session = saveCurrentSession(endedAt: stoppedAt) {
                 appState.finished(session)
             } else {
                 appState.backToMenu()
@@ -349,6 +359,7 @@ struct LiveRecordingScreen: View {
         let videoFilenameCopy = videoFilename
         let sessionIDCopy = sessionID
         let startedAtCopy = startedAt
+        let endedAtCopy = stoppedAt
         let mp4OriginCopy = mp4Origin
         appState.processing(processor)
         processor.start { [appState] in
@@ -357,6 +368,7 @@ struct LiveRecordingScreen: View {
                 evaluation: evaluationCopy,
                 sessionID: sessionIDCopy,
                 startedAt: startedAtCopy,
+                endedAt: endedAtCopy,
                 videoFilename: videoFilenameCopy,
                 recordingStartFrameIndex: mp4OriginCopy
             )
@@ -388,7 +400,7 @@ struct LiveRecordingScreen: View {
     /// has exactly `scoreCount == 1` (FoG's old 50%-overlap doubled-count
     /// path is gone), so a single coverage threshold works for all heads.
     @discardableResult
-    private func saveCurrentSession() -> Session? {
+    private func saveCurrentSession(endedAt: Date) -> Session? {
         guard let frameBuffer else {
             cleanupOrphanVideo()
             return nil
@@ -401,6 +413,7 @@ struct LiveRecordingScreen: View {
             evaluation: evaluation,
             sessionID: sessionID,
             startedAt: startedAt,
+            endedAt: endedAt,
             videoFilename: videoFilename,
             recordingStartFrameIndex: firstRecordedFrameIndex ?? recordingStartFrameIndex
         )
@@ -414,12 +427,15 @@ struct LiveRecordingScreen: View {
 
     /// Materialize a `Session` from a `FrameBuffer`'s scored window. Pure
     /// helper so the post-processing path can call it from outside the
-    /// screen's lifecycle (without touching `@State`).
+    /// screen's lifecycle (without touching `@State`). `endedAt` is passed
+    /// in (not `Date()` inside) so a long post-session drain doesn't pad
+    /// `session.duration` past the user's perceived stop time.
     fileprivate static func buildSession(
         buffer: FrameBuffer,
         evaluation: Evaluation,
         sessionID: UUID,
         startedAt: Date,
+        endedAt: Date,
         videoFilename: String?,
         recordingStartFrameIndex: Int
     ) -> Session? {
@@ -435,7 +451,7 @@ struct LiveRecordingScreen: View {
         return Session(
             id: sessionID,
             startedAt: startedAt,
-            endedAt: Date(),
+            endedAt: endedAt,
             scores: saved,
             device: DeviceInfo.current(),
             videoFilename: videoFilename,

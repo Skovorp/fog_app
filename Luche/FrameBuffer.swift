@@ -46,6 +46,13 @@ final class FrameBuffer {
     /// drain. Stays empty while inference keeps up with capture; grows by
     /// one entry every time `kickInferenceIfReady` sees ≥2 ready chunks.
     private(set) var stash: [Int] = []
+    /// Set to `true` once `LiveRecordingScreen` taps Stop. Latches the live
+    /// scheduler so `finishInflight` and any later `append` don't kick a
+    /// *new* chunk after the user has stopped — which would race the
+    /// `PostProcessor`, double-write that chunk's scores (the drain has
+    /// already listed it as unscored from the saved mp4), and inflate the
+    /// running-average.
+    private var isShutdown: Bool = false
 
     /// Smallest chunk-start the scheduler hasn't decided on yet (neither
     /// scored, nor stashed, nor in-flight). Increments by `chunkSize` each
@@ -109,6 +116,17 @@ final class FrameBuffer {
         }
     }
 
+    /// Latch the live scheduler so no new chunks are kicked off. Call this
+    /// *before* `awaitInflight()` in the Stop path: otherwise the in-flight
+    /// chunk's completion handler immediately calls `kickInferenceIfReady`
+    /// and a fresh live task starts on top of frames the `PostProcessor` is
+    /// about to re-score from the mp4. After `stopScheduling()`, every
+    /// remaining unscored chunk in the window is drained exclusively by
+    /// `PostProcessor` — no double-write race.
+    func stopScheduling() {
+        isShutdown = true
+    }
+
     /// Authoritative list of chunk-start indices that still need scoring
     /// after the user taps Stop. Computed by enumerating every full
     /// 64-frame chunk inside `[recordingStart, frames.count)` and keeping
@@ -149,6 +167,7 @@ final class FrameBuffer {
         inflightStart = -1
         oldestLivePixelBuffer = 0
         inflightTask = nil
+        isShutdown = false
     }
 
     /// Release pixel buffers we no longer need. With non-overlapping chunks
@@ -165,7 +184,7 @@ final class FrameBuffer {
     }
 
     private func kickInferenceIfReady() {
-        guard !inferenceInflight, let inference else { return }
+        guard !isShutdown, !inferenceInflight, let inference else { return }
         let chunk = Self.chunkSize
         let total = frames.count
         // Highest chunk-start whose 64 frames are all captured. `-1` means
