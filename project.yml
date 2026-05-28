@@ -9,7 +9,14 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    DEVELOPMENT_TEAM: "58PF9ZTCZS"
+    # Team `C896A4TZRB` owns the `com.ilovemaggie.svet` bundle ID + the
+    # App Store / TestFlight distribution profile (`11598e12-…`) + the
+    # Xcode-managed dev profile (`847e2b53-…`, includes the test phones in
+    # its ProvisionedDevices). Automatic signing reuses whichever matching
+    # profile is already cached in `~/Library/Developer/Xcode/UserData/
+    # Provisioning Profiles/` — no Apple-ID round-trip needed until those
+    # profiles expire or a new device gets added.
+    DEVELOPMENT_TEAM: C896A4TZRB
     CODE_SIGN_STYLE: Automatic
 
 packages:
