@@ -151,9 +151,22 @@ final class CameraSession: NSObject {
         let frameDuration = CMTime(value: 1, timescale: Int32(targetFPS))
         device.activeVideoMinFrameDuration = frameDuration
         device.activeVideoMaxFrameDuration = frameDuration
-        // Default to the widest available FOV (the ultrawide on multi-cam
-        // virtual devices). User can pinch in from there.
-        device.videoZoomFactor = device.minAvailableVideoZoomFactor
+        // Default to a 1.5× display-zoom — tight enough to fill the frame
+        // with the user without losing context. On multi-cam virtual
+        // devices `videoZoomFactor` is in *raw* units (raw = display ×
+        // switch-over), so multiply by the first switch-over factor to land
+        // on display 1.5; on single-lens devices `switchOverVideoZoomFactors`
+        // is empty and the multiplier collapses to 1. Clamped to the
+        // device's actual zoom envelope so phones without an ultrawide
+        // still get their minimum.
+        let switchOver: CGFloat = device.virtualDeviceSwitchOverVideoZoomFactors.first
+            .map { CGFloat(truncating: $0) } ?? 1
+        let targetDisplayZoom: CGFloat = 1.5
+        let rawTarget = targetDisplayZoom * switchOver
+        device.videoZoomFactor = Swift.min(
+            Swift.max(rawTarget, device.minAvailableVideoZoomFactor),
+            device.maxAvailableVideoZoomFactor
+        )
         device.unlockForConfiguration()
 
         let output = AVCaptureVideoDataOutput()
