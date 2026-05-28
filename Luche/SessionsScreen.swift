@@ -88,7 +88,7 @@ struct SessionsScreen: View {
             ShareSheet(items: [item.url])
         }
         .fullScreenCover(item: $playingVideo) { item in
-            SessionVideoPlayer(url: item.url) {
+            SessionVideoPlayer(url: item.url, session: item.session) {
                 playingVideo = nil
             }
         }
@@ -187,7 +187,7 @@ struct SessionsScreen: View {
 
     private func playSession(_ session: Session) {
         guard let url = VideoStore.existingURL(for: session) else { return }
-        playingVideo = PlayingVideo(id: session.id, url: url)
+        playingVideo = PlayingVideo(id: session.id, url: url, session: session)
         // Tapping any card implicitly dismisses the hint.
         if !tapHintSeen { tapHintSeen = true }
     }
@@ -277,6 +277,10 @@ private struct ExportItem: Identifiable {
 private struct PlayingVideo: Identifiable {
     let id: UUID
     let url: URL
+    /// Carried so the rewatch player can render the per-frame ScoreGraph
+    /// below the video. Sessions always have a `scores` array (possibly
+    /// empty for very short stops); the graph itself no-ops when count < 2.
+    let session: Session
 }
 
 private struct SessionCard: View {
@@ -410,40 +414,57 @@ struct ShareSheet: UIViewControllerRepresentable {
 
 private struct SessionVideoPlayer: View {
     let url: URL
+    let session: Session
     let onDismiss: () -> Void
     @State private var player: AVPlayer
 
-    init(url: URL, onDismiss: @escaping () -> Void) {
+    init(url: URL, session: Session, onDismiss: @escaping () -> Void) {
         self.url = url
+        self.session = session
         self.onDismiss = onDismiss
         _player = State(initialValue: AVPlayer(url: url))
     }
 
+    /// FoG evaluations get a 0.5 reference line on the graph; continuous
+    /// severity heads (chair / gait / tapping) suppress it because the
+    /// score is read as severity, not a classifier.
+    private var graphThreshold: Float? {
+        session.effectiveEvaluation.headlinesFogPct ? Session.fogThreshold : nil
+    }
+
     var body: some View {
-        ZStack {
-            Color.lucheInk.ignoresSafeArea()
+        // VStack so the AVKit player owns the upper region (still
+        // immersive — fills all available space, native controls intact)
+        // and ScoreGraph occupies a 96 pt strip below. Background stays
+        // edge-to-edge black; the VStack contents respect the safe area
+        // so the graph isn't behind the home indicator.
+        VStack(spacing: 0) {
             VideoPlayer(player: player)
-                .ignoresSafeArea()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .onAppear { player.play() }
                 .onDisappear { player.pause() }
 
-            VStack {
-                HStack {
-                    Spacer()
-                    Button(action: onDismiss) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(.white)
-                            .frame(width: 36, height: 36)
-                            .background(Color.lucheInk.opacity(0.55))
-                            .clipShape(Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.top, 16)
-                    .padding(.trailing, 20)
-                }
-                Spacer()
+            if session.scores.count >= 2 {
+                ScoreGraph(
+                    player: player,
+                    scores: session.scores,
+                    threshold: graphThreshold
+                )
             }
+        }
+        .background(Color.lucheInk.ignoresSafeArea())
+        .overlay(alignment: .topTrailing) {
+            Button(action: onDismiss) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 36, height: 36)
+                    .background(Color.lucheInk.opacity(0.55))
+                    .clipShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 16)
+            .padding(.trailing, 20)
         }
     }
 }
