@@ -49,7 +49,7 @@ struct ScoreGraph: View {
             )
         }
         .frame(height: panelHeight)
-        .background(Color.lucheInk)
+        .background(Color.black)
         .task(id: ObjectIdentifier(player)) { await loadDuration() }
         .onAppear(perform: attachObserver)
         .onDisappear(perform: detachObserver)

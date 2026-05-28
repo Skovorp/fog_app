@@ -457,14 +457,16 @@ private struct SessionVideoPlayer: View {
 
             Spacer(minLength: 0)
         }
-        .background(Color.lucheInk.ignoresSafeArea())
+        .background(Color.black.ignoresSafeArea())
         .overlay(alignment: .topTrailing) {
             Button(action: onDismiss) {
                 Image(systemName: "xmark")
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(.white)
                     .frame(width: 36, height: 36)
-                    .background(Color.lucheInk.opacity(0.55))
+                    // On a black backdrop a near-black tint is invisible;
+                    // a translucent white glass pill keeps the button readable.
+                    .background(Color.white.opacity(0.15))
                     .clipShape(Circle())
             }
             .buttonStyle(.plain)
